@@ -1,6 +1,12 @@
 """FastAPI entrypoint for the Real Estate Lead Agent."""
 from __future__ import annotations
 
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()  # reads .env before any module touches os.environ
+
 from fastapi import FastAPI
 
 from src.coordinator.router import router as coordinator_router

@@ -12,9 +12,6 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from src.coordinator.state_machine import transition
-from src.data.models import CoordinatorDecision, Lead, Message
-
 logger = logging.getLogger(__name__)
 
 _COORDINATOR_PROMPT = """You are the routing brain for a real estate lead-management system.
@@ -100,7 +97,7 @@ async def process_event(lead_id: str, event: str, payload: dict) -> None:
         build_reminder_message,
         build_cancellation_message,
     )
-    from src.tasks.followups import schedule_followup, cancel_pending_followups
+    from src.tasks.followups import schedule_followup, cancel_pending_followups, schedule_meeting_done
 
     lead = firestore_client.get_lead(lead_id)
     if not lead:
@@ -145,6 +142,7 @@ async def process_event(lead_id: str, event: str, payload: dict) -> None:
                 build_cancellation_message=build_cancellation_message,
                 schedule_followup=schedule_followup,
                 cancel_pending_followups=cancel_pending_followups,
+                schedule_meeting_done=schedule_meeting_done,
             )
         except Exception as exc:
             logger.error("Action %s failed for lead %s: %s", action, lead_id, exc)
@@ -201,12 +199,20 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
             msg = deps["build_confirmation_message"](lead, appt)
             twilio.send_whatsapp(lead.phone, msg)
             _store_outbound(fc, lead, msg)
+            # Schedule meeting_done to fire after the appointment ends
+            try:
+                deps["schedule_meeting_done"](lead.lead_id, appt.end)
+            except Exception as exc:
+                logger.warning("Could not schedule meeting_done task: %s", exc)
 
     elif action == "schedule_reminder":
         deps["schedule_followup"](lead.lead_id, 24, "reminder_24h_before")
 
     elif action == "schedule_24h_nudge":
         deps["schedule_followup"](lead.lead_id, 24, "nudge_24h")
+
+    elif action == "schedule_72h_timer":
+        deps["schedule_followup"](lead.lead_id, 72, "nudge_72h")
 
     elif action == "send_nudge":
         msg = (

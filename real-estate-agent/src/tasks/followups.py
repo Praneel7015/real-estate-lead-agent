@@ -54,6 +54,13 @@ def schedule_followup(lead_id: str, delay_hours: int, kind: str) -> None:
     client.create_task(request={"parent": _queue_path(), "task": task})
 
 
+def schedule_meeting_done(lead_id: str, meeting_end: datetime) -> None:
+    """Schedule the meeting_done event to fire at the appointment end time."""
+    now = datetime.now(tz=timezone.utc)
+    delay_hours = max(0, (meeting_end - now).total_seconds() / 3600)
+    schedule_followup(lead_id, delay_hours, "meeting_done")
+
+
 def cancel_pending_followups(lead_id: str) -> None:
     """Delete all pending tasks for this lead by listing and filtering by name."""
     client = _get_tasks_client()
@@ -100,3 +107,21 @@ async def handle_reminder_24h_before(lead_id: str, request: Request):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
     return {"status": "ok", "lead_id": lead_id, "event": "timer_reminder"}
+
+
+@router.post("/meeting_done")
+async def handle_meeting_done(lead_id: str, request: Request):
+    """
+    Called after the meeting time has passed — triggers REMINDED → DONE,
+    which fires the salesperson alert.
+
+    Schedule this via Cloud Tasks at the appointment end time.
+    Can also be triggered manually during the demo.
+    """
+    from src.coordinator.agent import process_event
+
+    try:
+        await process_event(lead_id, "meeting_done", {})
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+    return {"status": "ok", "lead_id": lead_id, "event": "meeting_done"}

@@ -3,16 +3,30 @@ FastAPI route handlers for lead intake and Twilio webhook.
 """
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Form
+from fastapi import APIRouter, HTTPException, Request, Form, Header
 from pydantic import BaseModel
 
 from src.data.models import Lead, Message
 
 router = APIRouter(tags=["leads"])
+
+
+def _validate_twilio_signature(request_url: str, post_data: dict, signature: str) -> bool:
+    """Validate the X-Twilio-Signature header to reject spoofed webhooks."""
+    auth_token = os.environ.get("TWILIO_AUTH_TOKEN", "")
+    if not auth_token:
+        return True  # Skip in dev if not configured
+    try:
+        from twilio.request_validator import RequestValidator  # type: ignore
+        validator = RequestValidator(auth_token)
+        return validator.validate(request_url, post_data, signature)
+    except Exception:
+        return False
 
 
 class LeadCreateRequest(BaseModel):
@@ -53,6 +67,12 @@ async def twilio_webhook(request: Request):
     from src.coordinator.agent import process_event
 
     form_data = dict(await request.form())
+
+    # Validate Twilio signature in production
+    twilio_sig = request.headers.get("X-Twilio-Signature", "")
+    request_url = str(request.url)
+    if not _validate_twilio_signature(request_url, form_data, twilio_sig):
+        raise HTTPException(status_code=403, detail="Invalid Twilio signature")
     from_number, body_text = parse_inbound_webhook(form_data)
 
     # Find lead by phone number
