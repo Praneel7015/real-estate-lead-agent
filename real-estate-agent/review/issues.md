@@ -6,7 +6,7 @@
 
 **Severity:** Spec Violation  
 **File:** `src/conversation/agent.py`  
-**Status:** Open
+**Status:** RESOLVED — Added public `handle_message(lead_id: str, incoming_text: str) -> ConversationResult` wrapper that loads the lead and messages from Firestore, then delegates to `_handle_message_internal`. The coordinator was updated to call `_handle_message_internal` directly since it already has the objects loaded.
 
 ### Expected (spec §6)
 ```python
@@ -60,7 +60,7 @@ def cancel(lead_id: str, event_id: str) -> None
 
 **Severity:** Warning (potential spec gap)  
 **File:** `src/coordinator/state_machine.py`, `src/data/models.py`  
-**Status:** Open
+**Status:** RESOLVED — Added transitions: `BOOKED/SLOT_OFFERED + reschedule_requested → RESCHEDULE_REQUESTED` (actions: `find_slots`), `RESCHEDULE_REQUESTED + slot_confirmed → BOOKED` (actions: `book_slot`, `schedule_reminder`, `cancel_nudges`), and `RESCHEDULE_REQUESTED + inbound_message → RESCHEDULE_REQUESTED` (actions: `invoke_conversation_agent`). Two new test cases added to `tests/test_state_machine.py`.
 
 ### Detail
 `models.py` lists `RESCHEDULE_REQUESTED` as one of the 13 states in `STATES`. The spec mentions 13 states including `RESCHEDULE_REQUESTED`. However, the transition table handles reschedule events via `("BOOKED", "reschedule_requested")` and `("SLOT_OFFERED", "reschedule_requested")` — both transition directly back to `SLOT_OFFERED`. The `RESCHEDULE_REQUESTED` state is never entered as a destination or used as a source; it exists in the constant list but is effectively unreachable.
