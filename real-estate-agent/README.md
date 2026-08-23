@@ -6,7 +6,7 @@ An AI-powered real estate lead qualification and appointment scheduling system. 
 
 The system is a multi-agent pipeline orchestrated by a deterministic state machine. When a new lead arrives, the **Coordinator** fires `lead_created`, transitions the lead through states (`NEW → CONTACTED → AWAITING_REPLY → REPLIED → SCORED → SLOT_OFFERED → BOOKED → REMINDED → DONE`), and dispatches work to specialist agents:
 
-- **Conversation Agent** (Gemini 1.5 Flash): Qualifies leads over WhatsApp, extracting budget, property preferences, and availability.
+- **Conversation Agent** (Gemini 2.0 Flash): Qualifies leads over WhatsApp, extracting budget, property preferences, and availability.
 - **Scoring Module**: Rule-based scoring (HIGH/MEDIUM/LOW) with Gemini-generated reason sentence.
 - **Scheduling Agent** (Gemini + Google Calendar): Finds free slots, books appointments, sends WhatsApp scheduling messages.
 - **Twilio**: Sends and receives WhatsApp messages.
