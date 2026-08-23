@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Find Your Dream Property</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+    }
+
+    .card {
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 480px;
+      box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1.8rem;
+    }
+    .logo-icon {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, #e94560, #0f3460);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      color: white; font-size: 1.2rem;
+    }
+    .logo-text { font-size: 1.1rem; font-weight: 700; color: #1a1a2e; }
+    .logo-sub  { font-size: 0.7rem; color: #888; letter-spacing: 0.05em; text-transform: uppercase; }
+
+    h1 {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #1a1a2e;
+      margin-bottom: 0.4rem;
+      line-height: 1.2;
+    }
+    .subtitle {
+      color: #666;
+      font-size: 0.9rem;
+      margin-bottom: 2rem;
+      line-height: 1.5;
+    }
+
+    .field { margin-bottom: 1.2rem; }
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 0.35rem;
+      letter-spacing: 0.02em;
+    }
+    .required { color: #e94560; margin-left: 2px; }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 0.75rem 1rem;
+      border: 2px solid #e8e8e8;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-family: inherit;
+      color: #1a1a2e;
+      background: #fafafa;
+      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      outline: none;
+      resize: none;
+    }
+    input:focus, textarea:focus, select:focus {
+      border-color: #0f3460;
+      background: #fff;
+      box-shadow: 0 0 0 4px rgba(15,52,96,0.08);
+    }
+    .phone-row { display: flex; gap: 0.5rem; }
+    .phone-prefix {
+      width: 90px; flex-shrink: 0;
+      appearance: none; cursor: pointer;
+    }
+
+    .submit-btn {
+      width: 100%;
+      padding: 0.9rem;
+      background: linear-gradient(135deg, #e94560, #c0283e);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      margin-top: 0.5rem;
+      transition: transform 0.15s, box-shadow 0.15s;
+      letter-spacing: 0.03em;
+    }
+    .submit-btn:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(233,69,96,0.4);
+    }
+    .submit-btn:active { transform: translateY(0); }
+    .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .spinner {
+      display: inline-block;
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .toast {
+      display: none;
+      margin-top: 1.2rem;
+      padding: 1rem 1.2rem;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .toast.success {
+      display: block;
+      background: #f0fff4;
+      border: 1.5px solid #38a169;
+      color: #276749;
+    }
+    .toast.error {
+      display: block;
+      background: #fff5f5;
+      border: 1.5px solid #e53e3e;
+      color: #9b2c2c;
+    }
+    .toast-icon { font-size: 1.3rem; vertical-align: middle; margin-right: 6px; }
+
+    .privacy {
+      text-align: center;
+      font-size: 0.75rem;
+      color: #aaa;
+      margin-top: 1.2rem;
+      line-height: 1.5;
+    }
+    .privacy a { color: #0f3460; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">&#127968;</div>
+      <div>
+        <div class="logo-text">PropAgent AI</div>
+        <div class="logo-sub">Real Estate Lead System</div>
+      </div>
+    </div>
+
+    <h1>Find Your Dream Property</h1>
+    <p class="subtitle">Tell us what you're looking for and our AI assistant will reach out via WhatsApp to help.</p>
+
+    <form id="leadForm" novalidate>
+      <div class="field">
+        <label for="name">Full Name <span class="required">*</span></label>
+        <input type="text" id="name" name="name" placeholder="e.g. Sarah Johnson" required autocomplete="name" />
+      </div>
+
+      <div class="field">
+        <label for="phone">WhatsApp Number <span class="required">*</span></label>
+        <div class="phone-row">
+          <select class="phone-prefix" id="countryCode" name="countryCode">
+            <option value="+1">🇺🇸 +1</option>
+            <option value="+44">🇬🇧 +44</option>
+            <option value="+91" selected>🇮🇳 +91</option>
+            <option value="+971">🇦🇪 +971</option>
+            <option value="+65">🇸🇬 +65</option>
+            <option value="+61">🇦🇺 +61</option>
+            <option value="+49">🇩🇪 +49</option>
+            <option value="+33">🇫🇷 +33</option>
+            <option value="+55">🇧🇷 +55</option>
+            <option value="+27">🇿🇦 +27</option>
+          </select>
+          <input type="tel" id="phone" name="phone" placeholder="9876543210" required autocomplete="tel" style="flex:1" />
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="looking_for">What are you looking for? <span class="required">*</span></label>
+        <textarea id="looking_for" name="looking_for" rows="3"
+          placeholder="e.g. 3-bedroom apartment near good schools, south-facing, parking essential"
+          required></textarea>
+      </div>
+
+      <div class="field">
+        <label for="budget">Approximate Budget</label>
+        <input type="text" id="budget" name="budget" placeholder="e.g. $400k–$500k or ₹80L–₹1Cr" autocomplete="off" />
+      </div>
+
+      <button type="submit" class="submit-btn" id="submitBtn">
+        Get AI-Powered Assistance &#10148;
+      </button>
+
+      <div class="toast" id="toast"></div>
+    </form>
+
+    <p class="privacy">
+      By submitting you agree to be contacted via WhatsApp. We respect your privacy &amp;
+      never share your data. <a href="#">Privacy Policy</a>
+    </p>
+  </div>
+
+  <script>
+    const form = document.getElementById('leadForm');
+    const btn  = document.getElementById('submitBtn');
+    const toast = document.getElementById('toast');
+
+    // Point to your deployed backend; defaults to same origin for local dev
+    const API_BASE = window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost'
+      ? 'http://localhost:8000'
+      : '';
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      toast.className = 'toast';
+      toast.textContent = '';
+
+      const name       = document.getElementById('name').value.trim();
+      const countryCode = document.getElementById('countryCode').value;
+      const phoneRaw   = document.getElementById('phone').value.trim().replace(/\D/g, '');
+      const lookingFor = document.getElementById('looking_for').value.trim();
+      const budget     = document.getElementById('budget').value.trim();
+
+      if (!name || !phoneRaw || !lookingFor) {
+        showToast('error', '&#9888;&#65039; Please fill in all required fields.');
+        return;
+      }
+
+      const phone = countryCode + phoneRaw;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Submitting…';
+
+      try {
+        const payload = {
+          name,
+          phone,
+          property_preferences: lookingFor,
+          budget: budget || null,
+        };
+
+        const res = await fetch(`${API_BASE}/leads`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          showToast('success',
+            `&#9989; You're all set, ${name}! Our AI assistant will message you on WhatsApp at ${phone} shortly.`
+          );
+          form.reset();
+        } else {
+          const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+          showToast('error', `&#10060; Submission failed: ${err.detail || res.statusText}`);
+        }
+      } catch (err) {
+        showToast('error', `&#10060; Could not connect to server. Please try again. (${err.message})`);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = 'Get AI-Powered Assistance &#10148;';
+      }
+    });
+
+    function showToast(type, html) {
+      toast.className = `toast ${type}`;
+      toast.innerHTML = html;
+      toast.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  </script>
+</body>
+</html>
