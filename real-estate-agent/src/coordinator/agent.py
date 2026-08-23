@@ -88,7 +88,7 @@ async def process_event(lead_id: str, event: str, payload: dict) -> None:
     from src.data import firestore_client
     from src.integrations import twilio_client
     from src.integrations.notify import alert_salesperson
-    from src.conversation.agent import handle_message
+    from src.conversation.agent import _handle_message_internal as handle_message
     from src.conversation.scoring import score_lead
     from src.scheduling.agent import (
         find_slots,

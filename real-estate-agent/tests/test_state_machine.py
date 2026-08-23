@@ -89,15 +89,28 @@ class TestHappyPathTransitions:
     def test_booked_reschedule_requested(self):
         lead = _lead("BOOKED")
         new_state, actions = transition(lead, "reschedule_requested", {})
-        assert new_state == "SLOT_OFFERED"
+        assert new_state == "RESCHEDULE_REQUESTED"
         assert "find_slots" in actions
-        assert "send_reschedule_slots" in actions
 
     def test_slot_offered_reschedule_requested(self):
         lead = _lead("SLOT_OFFERED")
         new_state, actions = transition(lead, "reschedule_requested", {})
-        assert new_state == "SLOT_OFFERED"
+        assert new_state == "RESCHEDULE_REQUESTED"
         assert "find_slots" in actions
+
+    def test_reschedule_requested_slot_confirmed(self):
+        lead = _lead("RESCHEDULE_REQUESTED")
+        new_state, actions = transition(lead, "slot_confirmed", {})
+        assert new_state == "BOOKED"
+        assert "book_slot" in actions
+        assert "schedule_reminder" in actions
+        assert "cancel_nudges" in actions
+
+    def test_reschedule_requested_inbound_message(self):
+        lead = _lead("RESCHEDULE_REQUESTED")
+        new_state, actions = transition(lead, "inbound_message", {})
+        assert new_state == "RESCHEDULE_REQUESTED"
+        assert "invoke_conversation_agent" in actions
 
     def test_reminded_meeting_done(self):
         lead = _lead("REMINDED")

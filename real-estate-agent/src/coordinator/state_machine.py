@@ -51,12 +51,20 @@ _TRANSITIONS: dict[tuple[str, str], tuple[str, list[str]]] = {
         ["cancel_calendar", "send_cancellation_ack"],
     ),
     ("BOOKED", "reschedule_requested"): (
-        "SLOT_OFFERED",
-        ["find_slots", "send_reschedule_slots"],
+        "RESCHEDULE_REQUESTED",
+        ["find_slots"],
     ),
     ("SLOT_OFFERED", "reschedule_requested"): (
-        "SLOT_OFFERED",
-        ["find_slots", "send_reschedule_slots"],
+        "RESCHEDULE_REQUESTED",
+        ["find_slots"],
+    ),
+    ("RESCHEDULE_REQUESTED", "slot_confirmed"): (
+        "BOOKED",
+        ["book_slot", "schedule_reminder", "cancel_nudges"],
+    ),
+    ("RESCHEDULE_REQUESTED", "inbound_message"): (
+        "RESCHEDULE_REQUESTED",
+        ["invoke_conversation_agent"],
     ),
     ("REMINDED", "meeting_done"): (
         "DONE",

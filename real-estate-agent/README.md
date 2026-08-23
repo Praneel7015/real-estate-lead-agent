@@ -65,10 +65,19 @@ See [`docs/whatsapp-sandbox.md`](docs/whatsapp-sandbox.md) for step-by-step sand
 ## Cloud Run Deployment
 
 ```bash
-# Build and push container
+# Build the Docker image locally
+docker build -t real-estate-agent .
+
+# Build and push container via Cloud Build
 gcloud builds submit --tag gcr.io/$PROJECT_ID/real-estate-agent
 
 # Deploy to Cloud Run
+gcloud run deploy real-estate-agent \
+  --image gcr.io/$PROJECT_ID/real-estate-agent \
+  --platform managed \
+  --allow-unauthenticated
+
+# Full deploy with environment variables
 gcloud run deploy real-estate-agent \
   --image gcr.io/$PROJECT_ID/real-estate-agent \
   --platform managed \
@@ -113,4 +122,3 @@ Tests cover:
 - **Twilio sandbox**: The sandbox uses a shared WhatsApp number and requires leads to opt-in by sending a join code. Production use requires Meta business API approval via Twilio.
 - **Calendar timezone**: All calendar slots are in UTC. For production, pass timezone info from the lead's location.
 - **Slot confirmation parsing**: The current implementation expects the coordinator to receive a `slot_confirmed` event with a slot payload. A full production system would add NLP to parse the lead's reply and identify the confirmed slot.
-- **No Dockerfile included**: Add a `FROM python:3.11-slim` Dockerfile for containerized Cloud Run deployment.

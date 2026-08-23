@@ -79,7 +79,18 @@ def _build_history(messages: list["Message"], incoming_text: str) -> list[dict]:
     return history
 
 
-def handle_message(
+def handle_message(lead_id: str, incoming_text: str) -> ConversationResult:
+    """Public interface per spec §6. Loads lead + messages from Firestore."""
+    from src.data.firestore_client import get_lead, get_messages
+
+    lead = get_lead(lead_id)
+    if lead is None:
+        raise ValueError(f"Lead {lead_id} not found")
+    messages = get_messages(lead_id)
+    return _handle_message_internal(lead, messages, incoming_text)
+
+
+def _handle_message_internal(
     lead: "Lead",
     messages: list["Message"],
     incoming_text: str,
