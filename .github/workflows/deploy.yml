@@ -52,6 +52,7 @@ jobs:
       # ── 6. Deploy to Cloud Run ──────────────────────────────────────────────
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
+        id: deploy
         with:
           service: ${{ env.SERVICE_NAME }}
           region: ${{ env.REGION }}
@@ -63,6 +64,7 @@ jobs:
             --cpu=1
             --timeout=60
             --allow-unauthenticated
+            --service-account=real-estate-agent-sa@${{ env.PROJECT_ID }}.iam.gserviceaccount.com
           env_vars: |
             GOOGLE_CLOUD_PROJECT=${{ secrets.GCP_PROJECT_ID }}
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
@@ -78,11 +80,10 @@ jobs:
             SMTP_USER=${{ secrets.SMTP_USER }}
             SMTP_PASS=${{ secrets.SMTP_PASS }}
             FROM_EMAIL=${{ secrets.FROM_EMAIL }}
-          secrets: |
-            GOOGLE_APPLICATION_CREDENTIALS=real-estate-agent-sa:latest
 
       # ── 7. Print the deployed URL ───────────────────────────────────────────
       - name: Show deployed URL
         run: |
           echo "✅ Deployed to: ${{ steps.deploy.outputs.url }}"
-          echo "CLOUD_RUN_URL=${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "### Deployed URL" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
