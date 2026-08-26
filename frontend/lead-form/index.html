@@ -248,6 +248,11 @@
       btn.disabled = true;
       btn.innerHTML = '<span class="spinner"></span> Submitting…';
 
+      // If the server takes >4s it is likely cold-starting — reassure the user
+      const warmingTimer = setTimeout(() => {
+        if (btn.disabled) btn.innerHTML = '<span class="spinner"></span> Warming up server…';
+      }, 4000);
+
       try {
         const payload = {
           name,
@@ -256,11 +261,16 @@
           budget: budget || null,
         };
 
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 30000); // 30s max
+
         const res = await fetch(`${API_BASE}/leads`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
+          signal: controller.signal,
         });
+        clearTimeout(timer);
 
         if (res.ok) {
           const data = await res.json();
@@ -282,6 +292,7 @@
       } catch (err) {
         showToast('error', `&#10060; Could not reach server: ${err.message || 'network error (possible CORS). Check console.'}`);
       } finally {
+        clearTimeout(warmingTimer);
         btn.disabled = false;
         btn.innerHTML = 'Get AI-Powered Assistance &#10148;';
       }

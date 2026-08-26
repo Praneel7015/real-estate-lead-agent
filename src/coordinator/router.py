@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Request, Form, Header
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request, Form, Header
 from pydantic import BaseModel
 
 from src.data.models import Lead, Message
@@ -38,7 +38,7 @@ class LeadCreateRequest(BaseModel):
 
 
 @router.post("/leads", status_code=201)
-async def create_lead(body: LeadCreateRequest):
+async def create_lead(body: LeadCreateRequest, background_tasks: BackgroundTasks):
     """Intake a new lead from the web form or API."""
     try:
         from src.data import firestore_client
@@ -61,12 +61,14 @@ async def create_lead(body: LeadCreateRequest):
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Firestore save failed: {exc}")
 
-    try:
-        await process_event(lead.lead_id, "lead_created", {})
-    except Exception as exc:
-        # Pipeline errors are non-fatal for lead creation — lead is already saved
+    async def _run_pipeline():
         import logging
-        logging.getLogger(__name__).error("process_event failed for %s: %s", lead.lead_id, exc)
+        try:
+            await process_event(lead.lead_id, "lead_created", {})
+        except Exception as exc:
+            logging.getLogger(__name__).error("process_event failed for %s: %s", lead.lead_id, exc)
+
+    background_tasks.add_task(_run_pipeline)
 
     return {"lead_id": lead.lead_id, "status": "created"}
 
