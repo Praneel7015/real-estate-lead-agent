@@ -40,8 +40,11 @@ class LeadCreateRequest(BaseModel):
 @router.post("/leads", status_code=201)
 async def create_lead(body: LeadCreateRequest):
     """Intake a new lead from the web form or API."""
-    from src.data import firestore_client
-    from src.coordinator.agent import process_event
+    try:
+        from src.data import firestore_client
+        from src.coordinator.agent import process_event
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Import error: {exc}")
 
     lead = Lead(
         lead_id=str(uuid.uuid4()),
@@ -52,10 +55,18 @@ async def create_lead(body: LeadCreateRequest):
         property_preferences=body.property_preferences,
         created_at=datetime.now(tz=timezone.utc),
     )
-    firestore_client.save_lead(lead)
 
-    # Kick off the pipeline asynchronously
-    await process_event(lead.lead_id, "lead_created", {})
+    try:
+        firestore_client.save_lead(lead)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Firestore save failed: {exc}")
+
+    try:
+        await process_event(lead.lead_id, "lead_created", {})
+    except Exception as exc:
+        # Pipeline errors are non-fatal for lead creation — lead is already saved
+        import logging
+        logging.getLogger(__name__).error("process_event failed for %s: %s", lead.lead_id, exc)
 
     return {"lead_id": lead.lead_id, "status": "created"}
 
