@@ -24,15 +24,23 @@ def _from_number() -> str:
 
 
 def send_whatsapp(to: str, body: str) -> str:
-    """Send a WhatsApp message. Returns the Twilio message SID."""
-    client = _get_client()
-    to_number = to if to.startswith("whatsapp:") else f"whatsapp:{to}"
-    message = client.messages.create(
-        from_=_from_number(),
-        to=to_number,
-        body=body,
-    )
-    return message.sid
+    """Send a WhatsApp message. Returns the Twilio message SID or 'skipped' on error."""
+    import logging
+    try:
+        client = _get_client()
+        to_number = to if to.startswith("whatsapp:") else f"whatsapp:{to}"
+        message = client.messages.create(
+            from_=_from_number(),
+            to=to_number,
+            body=body,
+        )
+        logging.getLogger(__name__).info("WhatsApp sent to %s sid=%s", to, message.sid)
+        return message.sid
+    except Exception as exc:
+        logging.getLogger(__name__).warning(
+            "WhatsApp send SKIPPED (to=%s): %s — message: %s", to, exc, body[:120]
+        )
+        return "skipped"
 
 
 def parse_inbound_webhook(form_data: dict) -> tuple[str, str]:
