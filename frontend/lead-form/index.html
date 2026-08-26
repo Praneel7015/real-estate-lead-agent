@@ -269,11 +269,18 @@
           );
           form.reset();
         } else {
-          const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
-          showToast('error', `&#10060; Submission failed: ${err.detail || res.statusText}`);
+          let detail = `HTTP ${res.status} ${res.statusText}`;
+          try {
+            const errBody = await res.json();
+            detail = errBody.detail || JSON.stringify(errBody);
+          } catch (_) {
+            const text = await res.text().catch(() => '');
+            if (text) detail += ` — ${text.slice(0, 200)}`;
+          }
+          showToast('error', `&#10060; Submission failed: ${detail}`);
         }
       } catch (err) {
-        showToast('error', `&#10060; Could not connect to server. Please try again. (${err.message})`);
+        showToast('error', `&#10060; Could not reach server: ${err.message || 'network error (possible CORS). Check console.'}`);
       } finally {
         btn.disabled = false;
         btn.innerHTML = 'Get AI-Powered Assistance &#10148;';
