@@ -262,7 +262,7 @@
         };
 
         const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 30000); // 30s max
+        const timer = setTimeout(() => controller.abort(), 90000); // 90s max
 
         const res = await fetch(`${API_BASE}/leads`, {
           method: 'POST',
