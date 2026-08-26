@@ -19,8 +19,9 @@ def _get_client():
         return firestore.Client(project=project)
     except Exception as exc:
         raise RuntimeError(
-            "Firestore client unavailable. Set GOOGLE_CLOUD_PROJECT and "
-            "GOOGLE_APPLICATION_CREDENTIALS."
+            f"Firestore client unavailable ({type(exc).__name__}: {exc}). "
+            "Ensure the Cloud Run service account has roles/datastore.user "
+            "and the Firestore database exists in Native mode."
         ) from exc
 
 
