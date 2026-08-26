@@ -32,4 +32,4 @@ app.include_router(tasks_router, prefix="/internal/tasks")
 
 @app.get("/health", tags=["ops"])
 async def health():
-    return {"status": "ok"}
+    return {"status": "ok", "version": "b8afcb9"}
