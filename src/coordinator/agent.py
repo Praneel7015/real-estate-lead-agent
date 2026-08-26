@@ -12,6 +12,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
+from src.data.models import Lead, Message, CoordinatorDecision
+from src.coordinator.state_machine import transition
+
 logger = logging.getLogger(__name__)
 
 _COORDINATOR_PROMPT = """You are the routing brain for a real estate lead-management system.
