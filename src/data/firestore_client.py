@@ -12,14 +12,31 @@ from src.data.models import Lead, Message
 
 
 def _get_client():
+    import json as _json
+
+    project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+    cred_value = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "").strip()
+
     try:
         from google.cloud import firestore  # type: ignore
 
-        project = os.environ.get("GOOGLE_CLOUD_PROJECT")
+        # If the env var holds raw JSON content (not a file path), parse it directly.
+        # This happens when the SA key JSON was stored as a Cloud Run env var instead
+        # of as a mounted file.
+        if cred_value.startswith("{"):
+            from google.oauth2.service_account import Credentials  # type: ignore
+            info = _json.loads(cred_value)
+            credentials = Credentials.from_service_account_info(
+                info,
+                scopes=["https://www.googleapis.com/auth/cloud-platform"],
+            )
+            return firestore.Client(project=project, credentials=credentials)
+
+        # Normal path: use ADC (Cloud Run attached SA) or GOOGLE_APPLICATION_CREDENTIALS file
         return firestore.Client(project=project)
     except Exception as exc:
         raise RuntimeError(
-            f"Firestore client unavailable ({type(exc).__name__}: {exc}). "
+            f"Firestore client unavailable ({type(exc).__name__}: {str(exc)[:300]}). "
             "Ensure the Cloud Run service account has roles/datastore.user "
             "and the Firestore database exists in Native mode."
         ) from exc

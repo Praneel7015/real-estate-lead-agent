@@ -50,6 +50,13 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.PROJECT_ID }}/cloud-run-source-deploy/${{ env.SERVICE_NAME }}:latest
 
       # ── 6. Deploy to Cloud Run ──────────────────────────────────────────────
+      - name: Remove stale GOOGLE_APPLICATION_CREDENTIALS env var from Cloud Run
+        run: |
+          gcloud run services update ${{ env.SERVICE_NAME }} \
+            --remove-env-vars=GOOGLE_APPLICATION_CREDENTIALS \
+            --region=${{ env.REGION }} \
+            --project=${{ env.PROJECT_ID }} 2>/dev/null || true
+
       - name: Deploy to Cloud Run
         uses: google-github-actions/deploy-cloudrun@v2
         id: deploy
