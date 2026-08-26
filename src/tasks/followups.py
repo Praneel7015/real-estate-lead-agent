@@ -29,7 +29,7 @@ def _queue_path() -> str:
     return client.queue_path(project, location, queue)
 
 
-def schedule_followup(lead_id: str, delay_hours: int, kind: str) -> None:
+def schedule_followup(lead_id: str, delay_hours: float, kind: str) -> None:
     """Create a Cloud Tasks task to call /internal/tasks/{kind}?lead_id=..."""
     client = _get_tasks_client()
     base_url = os.environ.get("CLOUD_RUN_URL", "http://localhost:8000")

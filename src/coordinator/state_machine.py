@@ -22,6 +22,10 @@ _TRANSITIONS: dict[tuple[str, str], tuple[str, list[str]]] = {
         "REPLIED",
         ["invoke_conversation_agent"],
     ),
+    ("CONTACTED", "timer_24h"): (
+        "AWAITING_REPLY",
+        ["send_nudge", "schedule_72h_timer"],
+    ),
     ("AWAITING_REPLY", "inbound_message"): (
         "REPLIED",
         ["invoke_conversation_agent"],
@@ -87,7 +91,8 @@ def transition(lead: "Lead", event: str, payload: dict) -> tuple[str, list[str]]
         if payload.get("is_complete"):
             return "SCORED", ["invoke_scoring"]
         else:
-            return "AWAITING_REPLY", ["invoke_conversation_agent"]
+            # Qualification not complete — wait for next inbound; no immediate action
+            return "AWAITING_REPLY", ["schedule_24h_nudge"]
 
     key = (current, event)
     if key in _TRANSITIONS:

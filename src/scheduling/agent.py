@@ -58,7 +58,7 @@ def _slots_to_text(slots: list[TimeSlot]) -> str:
 
 
 def find_slots(preferred_window: Optional[str] = None) -> list[TimeSlot]:
-    """Return up to 3 open slots within the next 7 days."""
+    """Return up to 6 open slots within the next 7 days (top 3 shown to lead)."""
     now = datetime.now(tz=timezone.utc)
     end = now + timedelta(days=7)
     all_slots = calendar_client.get_free_slots(now, end, duration_minutes=30)

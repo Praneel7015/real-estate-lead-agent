@@ -229,7 +229,7 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
         appt_data = lead.appointment or {}
         from src.data.models import Appointment
         from datetime import datetime
-        if appt_data:
+        if appt_data and appt_data.get("start") and appt_data.get("end"):
             appt = Appointment(
                 event_id=appt_data.get("eventId", ""),
                 lead_id=lead.lead_id,
@@ -257,7 +257,7 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
         from src.data.models import Appointment
         appt_data = lead.appointment or {}
         appt = None
-        if appt_data:
+        if appt_data and appt_data.get("start") and appt_data.get("end"):
             appt = Appointment(
                 event_id=appt_data.get("eventId", ""),
                 lead_id=lead.lead_id,

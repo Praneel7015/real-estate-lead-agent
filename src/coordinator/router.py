@@ -3,6 +3,7 @@ FastAPI route handlers for lead intake and Twilio webhook.
 """
 from __future__ import annotations
 
+import dataclasses
 import os
 import uuid
 from datetime import datetime, timezone
@@ -114,7 +115,7 @@ async def list_leads(state: Optional[str] = None):
     from src.data import firestore_client
 
     leads = firestore_client.list_leads(state=state)
-    return [lead.__dict__ for lead in leads]
+    return [dataclasses.asdict(lead) for lead in leads]
 
 
 @router.get("/leads/{lead_id}")
@@ -125,4 +126,4 @@ async def get_lead(lead_id: str):
     lead = firestore_client.get_lead(lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
-    return lead.__dict__
+    return dataclasses.asdict(lead)
