@@ -34,6 +34,7 @@ class Lead:
     followups_sent: list = field(default_factory=list)
     appointment: Optional[dict] = None  # {eventId, start, end}
     salesperson_alerted: bool = False
+    telegram_chat_id: Optional[str] = None
 
 
 @dataclass

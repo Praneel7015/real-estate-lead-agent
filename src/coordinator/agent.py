@@ -86,7 +86,7 @@ def _llm_resolve(lead: Lead, event: str, payload: dict) -> CoordinatorDecision:
 async def process_event(lead_id: str, event: str, payload: dict) -> None:
     """Main coordinator entry point — loads lead, runs SM, executes actions."""
     from src.data import firestore_client
-    from src.integrations import twilio_client
+    from src.integrations import telegram_client as twilio_client
     from src.integrations.notify import alert_salesperson
     from src.conversation.agent import _handle_message_internal as handle_message
     from src.conversation.scoring import score_lead
@@ -153,22 +153,32 @@ async def process_event(lead_id: str, event: str, payload: dict) -> None:
 
 async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> None:
     fc = deps["firestore_client"]
-    twilio = deps["twilio_client"]
+    tg = deps["twilio_client"]  # now telegram_client, aliased for minimal diff
+
+    def _send(msg: str) -> None:
+        """Send via Telegram if chat_id is known, otherwise log."""
+        if lead.telegram_chat_id:
+            tg.send_message(lead.telegram_chat_id, msg)
+        else:
+            logger.info(
+                "No telegram_chat_id for lead %s — message queued: %s",
+                lead.lead_id, msg[:80],
+            )
 
     if action == "send_opening_message":
         msg = (
-            f"Hi {lead.name}! Thanks for your interest. "
-            "I'm here to help you find the right property. "
-            "Could you tell me a bit about what you're looking for?"
+            f"Hi {lead.name}! Thanks for your interest in finding a property. "
+            "I'm your AI real estate assistant. "
+            "Could you tell me more about what you're looking for?"
         )
-        twilio.send_whatsapp(lead.phone, msg)
+        _send(msg)
         _store_outbound(fc, lead, msg)
 
     elif action == "invoke_conversation_agent":
         messages = fc.get_messages(lead.lead_id)
         incoming = payload.get("body", "")
         result = deps["handle_message"](lead, messages, incoming)
-        twilio.send_whatsapp(lead.phone, result.reply_text)
+        _send(result.reply_text)
         _store_outbound(fc, lead, result.reply_text)
         fc.save_lead(lead)
         # Trigger next state based on is_complete
@@ -186,7 +196,7 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
     elif action in ("find_slots", "send_slots_message", "send_reschedule_slots"):
         slots = deps["find_slots"](lead.availability)
         msg = deps["build_slot_offer_message"](lead, slots)
-        twilio.send_whatsapp(lead.phone, msg)
+        _send(msg)
         _store_outbound(fc, lead, msg)
 
     elif action == "book_slot":
@@ -200,7 +210,7 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
             }
             fc.save_lead(lead)
             msg = deps["build_confirmation_message"](lead, appt)
-            twilio.send_whatsapp(lead.phone, msg)
+            _send(msg)
             _store_outbound(fc, lead, msg)
             # Schedule meeting_done to fire after the appointment ends
             try:
@@ -222,7 +232,7 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
             f"Hi {lead.name}, just checking in — are you still looking for a property? "
             "Happy to help whenever you're ready!"
         )
-        twilio.send_whatsapp(lead.phone, msg)
+        _send(msg)
         _store_outbound(fc, lead, msg)
 
     elif action == "send_reminder":
@@ -237,7 +247,7 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
                 end=datetime.fromisoformat(appt_data["end"]),
             )
             msg = deps["build_reminder_message"](lead, appt)
-            twilio.send_whatsapp(lead.phone, msg)
+            _send(msg)
             _store_outbound(fc, lead, msg)
 
     elif action == "cancel_calendar":
@@ -247,7 +257,7 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
 
     elif action == "send_cancellation_ack":
         msg = deps["build_cancellation_message"](lead)
-        twilio.send_whatsapp(lead.phone, msg)
+        _send(msg)
         _store_outbound(fc, lead, msg)
 
     elif action == "cancel_nudges":

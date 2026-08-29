@@ -111,3 +111,11 @@ def list_leads(state: Optional[str] = None) -> list[Lead]:
     if state:
         ref = ref.where("state", "==", state)
     return [_lead_from_doc(doc.to_dict()) for doc in ref.stream()]
+
+
+def get_lead_by_telegram_chat_id(chat_id: str) -> Optional[Lead]:
+    db = _get_client()
+    docs = db.collection("leads").where("telegram_chat_id", "==", chat_id).limit(1).stream()
+    for doc in docs:
+        return _lead_from_doc(doc.to_dict())
+    return None

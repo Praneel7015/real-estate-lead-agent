@@ -82,6 +82,8 @@ jobs:
             SMTP_USER=${{ secrets.SMTP_USER }}
             SMTP_PASS=${{ secrets.SMTP_PASS }}
             FROM_EMAIL=${{ secrets.FROM_EMAIL }}
+            TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
+            TELEGRAM_BOT_USERNAME=ZealEstateAIBot
 
       # ── 7. Print the deployed URL ───────────────────────────────────────────
       - name: Show deployed URL

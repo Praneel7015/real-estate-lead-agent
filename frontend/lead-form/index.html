@@ -274,8 +274,14 @@
 
         if (res.ok) {
           const data = await res.json();
+          const leadId = data.lead_id;
+          const botUsername = 'ZealEstateAIBot';
+          const tgLink = `https://t.me/${botUsername}?start=${leadId}`;
           showToast('success',
-            `&#9989; You're all set, ${name}! Our AI assistant will message you on WhatsApp at ${phone} shortly.`
+            `✅ You're all set, ${name}!<br><br>` +
+            `<strong>Next step:</strong> Tap the button below to start your AI property search on Telegram.<br><br>` +
+            `<a href="${tgLink}" target="_blank" style="display:inline-block;background:#229ED9;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:4px;">` +
+            `📱 Open Telegram Chat</a>`
           );
           form.reset();
         } else {
