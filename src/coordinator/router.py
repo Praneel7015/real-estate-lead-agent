@@ -300,6 +300,19 @@ async def twilio_webhook(request: Request):
     return {"status": "ok"}
 
 
+@router.get("/appointments")
+async def list_appointments():
+    """List all booked appointments."""
+    from src.data.firestore_client import _get_client
+    from datetime import datetime
+    try:
+        db = _get_client()
+        docs = db.collection("appointments").stream()
+        return [doc.to_dict() for doc in docs]
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 @router.get("/leads")
 async def list_leads(state: Optional[str] = None):
     """List all leads, optionally filtered by state."""
