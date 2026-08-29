@@ -35,6 +35,7 @@ class Lead:
     appointment: Optional[dict] = None  # {eventId, start, end}
     salesperson_alerted: bool = False
     telegram_chat_id: Optional[str] = None
+    offered_slots: list = field(default_factory=list)  # [{label, start_iso, end_iso}]
 
 
 @dataclass

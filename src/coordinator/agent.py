@@ -177,13 +177,19 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
     elif action == "invoke_conversation_agent":
         messages = fc.get_messages(lead.lead_id)
         incoming = payload.get("body", "")
-        result = deps["handle_message"](lead, messages, incoming)
-        _send(result.reply_text)
-        _store_outbound(fc, lead, result.reply_text)
+        try:
+            result = deps["handle_message"](lead, messages, incoming)
+            reply = result.reply_text
+            is_complete = result.is_complete
+        except Exception as exc:
+            logger.error("Conversation agent failed for %s: %s", lead.lead_id, exc)
+            reply = "Thanks for your message! Let me look into that and get back to you shortly. 🙏"
+            is_complete = False
+        _send(reply)
+        _store_outbound(fc, lead, reply)
         fc.save_lead(lead)
-        # Trigger next state based on is_complete
         await process_event(
-            lead.lead_id, "is_complete_true", {"is_complete": result.is_complete}
+            lead.lead_id, "is_complete_true", {"is_complete": is_complete}
         )
 
     elif action == "invoke_scoring":
@@ -195,9 +201,24 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
 
     elif action in ("find_slots", "send_slots_message", "send_reschedule_slots"):
         slots = deps["find_slots"](lead.availability)
-        msg = deps["build_slot_offer_message"](lead, slots)
-        _send(msg)
-        _store_outbound(fc, lead, msg)
+        if lead.telegram_chat_id and slots:
+            # Build slot list for buttons and store on lead for callback resolution
+            slot_data = [
+                {
+                    "label": f"📅 {s.start.strftime('%a %d %b, %I:%M %p')}",
+                    "start_iso": s.start.isoformat(),
+                    "end_iso": s.end.isoformat(),
+                }
+                for s in slots[:3]
+            ]
+            lead.offered_slots = slot_data
+            fc.save_lead(lead)
+            from src.integrations.telegram_client import send_slot_buttons
+            send_slot_buttons(lead.telegram_chat_id, lead.lead_id, slot_data)
+        else:
+            msg = deps["build_slot_offer_message"](lead, slots)
+            _send(msg)
+            _store_outbound(fc, lead, msg)
 
     elif action == "book_slot":
         slot = payload.get("slot")
@@ -209,9 +230,14 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
                 "end": appt.end.isoformat(),
             }
             fc.save_lead(lead)
-            msg = deps["build_confirmation_message"](lead, appt)
-            _send(msg)
-            _store_outbound(fc, lead, msg)
+            if lead.telegram_chat_id:
+                from src.integrations.telegram_client import send_booking_confirmation_buttons
+                slot_label = f"📅 {appt.start.strftime('%a %d %b, %I:%M %p')}"
+                send_booking_confirmation_buttons(lead.telegram_chat_id, lead.lead_id, slot_label)
+            else:
+                msg = deps["build_confirmation_message"](lead, appt)
+                _send(msg)
+                _store_outbound(fc, lead, msg)
             # Schedule meeting_done to fire after the appointment ends
             try:
                 deps["schedule_meeting_done"](lead.lead_id, appt.end)

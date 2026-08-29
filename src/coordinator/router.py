@@ -75,72 +75,177 @@ async def create_lead(body: LeadCreateRequest, background_tasks: BackgroundTasks
 
 @router.post("/webhook/telegram")
 async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
-    """Receive inbound messages from Telegram Bot API."""
-    from src.integrations.telegram_client import parse_update, send_message
+    """Receive inbound Telegram updates: messages and inline keyboard callbacks."""
+    import logging
+    from src.integrations import telegram_client as tg
     from src.data import firestore_client
     from src.coordinator.agent import process_event
 
     body = await request.json()
-    chat_id, text, start_payload = parse_update(body)
+    chat_id, text, start_payload, cq_id, cq_data = tg.parse_update(body)
 
     if not chat_id:
         return {"ok": True}
 
-    # /start <lead_id> deep-link — connect this chat to the lead record
+    log = logging.getLogger(__name__)
+
+    # ── /start <lead_id> deep-link ──────────────────────────────────────────
     if start_payload:
         lead = firestore_client.get_lead(start_payload)
         if lead:
             lead.telegram_chat_id = chat_id
-            firestore_client.save_lead(lead)
-            # Send opening message now that we have the chat_id
-            msg = (
-                f"Hi {lead.name}! Thanks for your interest in finding a property. "
-                "I'm your AI real estate assistant. "
-                "Could you tell me more about what you're looking for? "
-                "(e.g. type of property, location, budget)"
-            )
-            send_message(chat_id, msg)
-            from src.data.models import Message as Msg
-            from datetime import datetime, timezone
-            fc_msg = Msg(
-                message_id=str(__import__("uuid").uuid4()),
-                lead_id=lead.lead_id,
-                direction="outbound",
-                body=msg,
-                timestamp=datetime.now(tz=timezone.utc),
-            )
-            firestore_client.add_message(lead.lead_id, fc_msg)
             lead.state = "CONTACTED"
             firestore_client.save_lead(lead)
+            tg.send_property_type_buttons(chat_id, lead.lead_id, lead.name)
         else:
-            send_message(chat_id, "Sorry, I couldn't find your registration. Please fill out the form again.")
+            tg.send_message(chat_id, "Sorry, I couldn't find your registration. Please fill out the form again.")
         return {"ok": True}
 
-    # Regular inbound message — find lead by chat_id
+    # ── Inline keyboard callback (button press) ─────────────────────────────
+    if cq_id and cq_data:
+        tg.answer_callback(cq_id)
+        parts = cq_data.split(":", 2)
+        action_type = parts[0] if parts else ""
+        lead_id = parts[1] if len(parts) > 1 else ""
+        value = parts[2] if len(parts) > 2 else ""
+
+        lead = firestore_client.get_lead(lead_id) if lead_id else None
+        if not lead:
+            tg.send_message(chat_id, "Session expired. Please fill out the form again.")
+            return {"ok": True}
+
+        if action_type == "pt":  # property type selected
+            labels = {
+                "apartment": "🏢 Apartment", "house": "🏡 House",
+                "villa": "🏰 Villa", "commercial": "🏪 Commercial", "other": "Other",
+            }
+            if value != "other":
+                lead.property_preferences = labels.get(value, value)
+                firestore_client.save_lead(lead)
+                tg.send_budget_buttons(chat_id, lead.lead_id)
+            else:
+                tg.send_message(chat_id, "No problem! Tell me what kind of property you have in mind.")
+
+        elif action_type == "bd":  # budget selected
+            budget_labels = {
+                "lt50L": "Under ₹50L", "50-100L": "₹50L – ₹1Cr",
+                "1-2Cr": "₹1Cr – ₹2Cr", "gt2Cr": "₹2Cr+",
+            }
+            if value != "custom":
+                lead.budget = budget_labels.get(value, value)
+                firestore_client.save_lead(lead)
+                tg.send_availability_question(chat_id, lead.lead_id)
+            else:
+                tg.send_message(chat_id, "Sure! What's your budget? (e.g. ₹80L, 1.5 crore, etc.)")
+
+        elif action_type == "av":  # availability selected
+            avail_labels = {
+                "thisweek": "This week", "nextweek": "Next week", "weekends": "Weekends",
+            }
+            if value != "custom":
+                lead.availability = avail_labels.get(value, value)
+                firestore_client.save_lead(lead)
+                tg.send_message(chat_id,
+                    f"Perfect! I have everything I need. Let me find some great property options and available slots for you — one moment! 🔍")
+                async def _score_and_schedule():
+                    try:
+                        await process_event(lead.lead_id, "is_complete_true", {"is_complete": True})
+                    except Exception as exc:
+                        log.error("score_and_schedule failed for %s: %s", lead.lead_id, exc)
+                background_tasks.add_task(_score_and_schedule)
+            else:
+                tg.send_message(chat_id, "When works best for you? (e.g. Tuesday evening, this weekend, etc.)")
+
+        elif action_type == "sl":  # slot selected
+            try:
+                idx = int(value)
+                offered = lead.offered_slots
+                if 0 <= idx < len(offered):
+                    slot_info = offered[idx]
+                    from src.data.models import TimeSlot
+                    from datetime import datetime as dt
+                    slot = TimeSlot(
+                        start=dt.fromisoformat(slot_info["start_iso"]),
+                        end=dt.fromisoformat(slot_info["end_iso"]),
+                    )
+                    async def _book():
+                        try:
+                            await process_event(lead.lead_id, "slot_confirmed", {"slot": slot})
+                        except Exception as exc:
+                            log.error("slot booking failed: %s", exc)
+                    background_tasks.add_task(_book)
+                    tg.send_booking_confirmation_buttons(chat_id, lead.lead_id, slot_info["label"])
+                else:
+                    tg.send_message(chat_id, "Sorry, that slot is no longer available. Let me find new ones.")
+                    await process_event(lead.lead_id, "reschedule_requested", {})
+            except (ValueError, IndexError):
+                tg.send_message(chat_id, "Something went wrong picking that slot. Please try again.")
+
+        elif action_type == "rs":  # reschedule
+            tg.send_message(chat_id, "No problem! Let me find some new times for you.")
+            async def _reschedule():
+                try:
+                    await process_event(lead.lead_id, "reschedule_requested", {})
+                except Exception as exc:
+                    log.error("reschedule failed: %s", exc)
+            background_tasks.add_task(_reschedule)
+
+        elif action_type == "cx":  # cancel
+            tg.send_message(chat_id, "Your appointment has been cancelled. Feel free to reach out anytime if you'd like to reschedule! 😊")
+            async def _cancel():
+                try:
+                    await process_event(lead.lead_id, "cancel_requested", {})
+                except Exception as exc:
+                    log.error("cancel failed: %s", exc)
+            background_tasks.add_task(_cancel)
+
+        return {"ok": True}
+
+    # ── Regular inbound text message ────────────────────────────────────────
     lead = firestore_client.get_lead_by_telegram_chat_id(chat_id)
     if not lead:
-        send_message(chat_id, "Hi! Please fill out our property search form first to get started.")
+        tg.send_message(chat_id, "Hi! Please fill out our property search form first to get started.")
         return {"ok": True}
 
-    from src.data.models import Message as Msg
-    from datetime import datetime, timezone
-    msg = Msg(
-        message_id=str(__import__("uuid").uuid4()),
+    # Store inbound message
+    inbound_msg = Message(
+        message_id=str(uuid.uuid4()),
         lead_id=lead.lead_id,
         direction="inbound",
         body=text,
         timestamp=datetime.now(tz=timezone.utc),
     )
-    firestore_client.add_message(lead.lead_id, msg)
-    lead.last_reply_at = msg.timestamp
+    firestore_client.add_message(lead.lead_id, inbound_msg)
+    lead.last_reply_at = inbound_msg.timestamp
     firestore_client.save_lead(lead)
 
+    # If still in intake (no budget yet), treat reply as custom budget input
+    if lead.state == "CONTACTED" and not lead.budget:
+        lead.budget = text
+        firestore_client.save_lead(lead)
+        tg.send_availability_question(chat_id, lead.lead_id)
+        return {"ok": True}
+
+    # If availability missing, treat reply as availability input then complete
+    if lead.state == "CONTACTED" and not lead.availability:
+        lead.availability = text
+        firestore_client.save_lead(lead)
+        tg.send_message(chat_id, "Perfect! Let me find some great options and available slots for you — one moment! 🔍")
+        async def _complete():
+            try:
+                await process_event(lead.lead_id, "is_complete_true", {"is_complete": True})
+            except Exception as exc:
+                log.error("complete failed for %s: %s", lead.lead_id, exc)
+        background_tasks.add_task(_complete)
+        return {"ok": True}
+
+    # All other states: route through state machine (Gemini conversation)
     async def _run():
-        import logging
         try:
             await process_event(lead.lead_id, "inbound_message", {"body": text})
         except Exception as exc:
-            logging.getLogger(__name__).error("Telegram pipeline error for %s: %s", lead.lead_id, exc)
+            log.error("Telegram pipeline error for %s: %s", lead.lead_id, exc)
+            tg.send_message(chat_id, "Sorry, I hit a snag — I'll get back to you shortly! 🙏")
 
     background_tasks.add_task(_run)
     return {"ok": True}
