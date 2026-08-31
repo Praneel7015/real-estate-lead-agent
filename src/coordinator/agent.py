@@ -58,13 +58,7 @@ def _strip_fences(text: str) -> str:
 
 
 def _llm_resolve(lead: Lead, event: str, payload: dict) -> CoordinatorDecision:
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise EnvironmentError("GEMINI_API_KEY environment variable is not set.")
-    import google.generativeai as genai  # type: ignore
-
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-3.5-flash")
+    from src.integrations.gemini_client import generate_text
 
     context = (
         f"{_COORDINATOR_PROMPT}\n\n"
@@ -73,8 +67,7 @@ def _llm_resolve(lead: Lead, event: str, payload: dict) -> CoordinatorDecision:
         f"Payload: {json.dumps(payload)}\n"
         "Decide what to do next. Return only the JSON."
     )
-    response = model.generate_content(context)
-    data = json.loads(_strip_fences(response.text))
+    data = json.loads(_strip_fences(generate_text(context)))
     return CoordinatorDecision(
         action=data.get("action", "no_action"),
         next_state=data.get("next_state", "unchanged"),
@@ -100,7 +93,12 @@ async def process_event(lead_id: str, event: str, payload: dict) -> None:
         build_reminder_message,
         build_cancellation_message,
     )
-    from src.tasks.followups import schedule_followup, cancel_pending_followups, schedule_meeting_done
+    from src.tasks.followups import (
+        schedule_followup,
+        cancel_pending_followups,
+        schedule_meeting_done,
+        schedule_reminder_before_appt,
+    )
 
     lead = firestore_client.get_lead(lead_id)
     if not lead:
@@ -146,6 +144,7 @@ async def process_event(lead_id: str, event: str, payload: dict) -> None:
                 schedule_followup=schedule_followup,
                 cancel_pending_followups=cancel_pending_followups,
                 schedule_meeting_done=schedule_meeting_done,
+                schedule_reminder_before_appt=schedule_reminder_before_appt,
             )
         except Exception as exc:
             logger.error("Action %s failed for lead %s: %s", action, lead_id, exc)
@@ -181,16 +180,26 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
             result = deps["handle_message"](lead, messages, incoming)
             reply = result.reply_text
             is_complete = result.is_complete
+            intent = result.intent
         except Exception as exc:
             logger.error("Conversation agent failed for %s: %s", lead.lead_id, exc)
-            reply = "Thanks for your message! Let me look into that and get back to you shortly. 🙏"
+            reply = "Thanks for your message! Let me look into that and get back to you shortly."
             is_complete = False
+            intent = "qualifying"
         _send(reply)
         _store_outbound(fc, lead, reply)
         fc.save_lead(lead)
-        await process_event(
-            lead.lead_id, "is_complete_true", {"is_complete": is_complete}
-        )
+
+        if intent == "cancel":
+            await process_event(lead.lead_id, "cancel_requested", {})
+        elif intent == "reschedule":
+            await process_event(lead.lead_id, "reschedule_requested", {})
+        elif intent == "confirm" and lead.state in ("SLOT_OFFERED", "RESCHEDULE_REQUESTED"):
+            await process_event(lead.lead_id, "slot_confirmed", payload)
+        else:
+            await process_event(
+                lead.lead_id, "is_complete_true", {"is_complete": is_complete}
+            )
 
     elif action == "invoke_scoring":
         score, reason = deps["score_lead"](lead)
@@ -223,7 +232,16 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
     elif action == "book_slot":
         slot = payload.get("slot")
         if slot:
-            appt = deps["book_slot"](lead.lead_id, slot, lead)
+            try:
+                appt = deps["book_slot"](lead.lead_id, slot, lead)
+            except Exception as exc:
+                logger.error("book_slot failed for %s: %s", lead.lead_id, exc)
+                if lead.telegram_chat_id:
+                    tg.send_message(
+                        lead.telegram_chat_id,
+                        "Sorry, I couldn't book that slot. Please pick another time.",
+                    )
+                return
             lead.appointment = {
                 "eventId": appt.event_id,
                 "start": appt.start.isoformat(),
@@ -232,26 +250,76 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
             fc.save_lead(lead)
             if lead.telegram_chat_id:
                 from src.integrations.telegram_client import send_booking_confirmation_buttons
-                slot_label = f"📅 {appt.start.strftime('%a %d %b, %I:%M %p')}"
+                slot_label = appt.start.strftime("%a %d %b, %I:%M %p")
                 send_booking_confirmation_buttons(lead.telegram_chat_id, lead.lead_id, slot_label)
             else:
                 msg = deps["build_confirmation_message"](lead, appt)
                 _send(msg)
                 _store_outbound(fc, lead, msg)
-            # Schedule meeting_done to fire after the appointment ends
+            try:
+                deps["schedule_meeting_done"](lead.lead_id, appt.end)
+            except Exception as exc:
+                logger.warning("Could not schedule meeting_done task: %s", exc)
+
+    elif action == "reschedule_slot":
+        slot = payload.get("slot")
+        appt_data = lead.appointment or {}
+        event_id = appt_data.get("eventId", "")
+        if slot and event_id:
+            try:
+                appt = deps["reschedule"](lead.lead_id, slot, event_id)
+            except Exception as exc:
+                logger.error("reschedule_slot failed for %s: %s", lead.lead_id, exc)
+                if lead.telegram_chat_id:
+                    tg.send_message(
+                        lead.telegram_chat_id,
+                        "Sorry, I couldn't reschedule. Please try another slot.",
+                    )
+                return
+            lead.appointment = {
+                "eventId": appt.event_id,
+                "start": appt.start.isoformat(),
+                "end": appt.end.isoformat(),
+            }
+            fc.save_lead(lead)
+            if lead.telegram_chat_id:
+                from src.integrations.telegram_client import send_booking_confirmation_buttons
+                slot_label = appt.start.strftime("%a %d %b, %I:%M %p")
+                send_booking_confirmation_buttons(lead.telegram_chat_id, lead.lead_id, slot_label)
+            else:
+                msg = deps["build_confirmation_message"](lead, appt)
+                _send(msg)
+                _store_outbound(fc, lead, msg)
             try:
                 deps["schedule_meeting_done"](lead.lead_id, appt.end)
             except Exception as exc:
                 logger.warning("Could not schedule meeting_done task: %s", exc)
 
     elif action == "schedule_reminder":
-        deps["schedule_followup"](lead.lead_id, 24, "reminder_24h_before")
+        appt_data = lead.appointment or {}
+        if appt_data.get("start"):
+            try:
+                appt_start = datetime.fromisoformat(appt_data["start"])
+                deps["schedule_reminder_before_appt"](lead.lead_id, appt_start)
+            except Exception as exc:
+                logger.warning("Could not schedule reminder task: %s", exc)
+        else:
+            try:
+                deps["schedule_followup"](lead.lead_id, 24, "reminder_24h_before")
+            except Exception as exc:
+                logger.warning("Could not schedule reminder task: %s", exc)
 
     elif action == "schedule_24h_nudge":
-        deps["schedule_followup"](lead.lead_id, 24, "nudge_24h")
+        try:
+            deps["schedule_followup"](lead.lead_id, 24, "nudge_24h")
+        except Exception as exc:
+            logger.warning("Could not schedule 24h nudge: %s", exc)
 
     elif action == "schedule_72h_timer":
-        deps["schedule_followup"](lead.lead_id, 72, "nudge_72h")
+        try:
+            deps["schedule_followup"](lead.lead_id, 72, "nudge_72h")
+        except Exception as exc:
+            logger.warning("Could not schedule 72h timer: %s", exc)
 
     elif action == "send_nudge":
         msg = (

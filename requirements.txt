@@ -1,6 +1,6 @@
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
-google-generativeai>=0.7.0
+google-genai>=1.0.0
 google-cloud-firestore>=2.16.0
 google-cloud-tasks>=2.16.0
 google-api-python-client>=2.131.0

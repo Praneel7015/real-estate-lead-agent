@@ -29,6 +29,17 @@ def _queue_path() -> str:
     return client.queue_path(project, location, queue)
 
 
+def schedule_reminder_before_appt(lead_id: str, appt_start: datetime) -> None:
+    """Schedule reminder 24 hours before appointment (min 15 minutes from now)."""
+    now = datetime.now(tz=timezone.utc)
+    reminder_at = appt_start - timedelta(hours=24)
+    if reminder_at <= now:
+        delay_hours = 0.25  # 15 minutes
+    else:
+        delay_hours = (reminder_at - now).total_seconds() / 3600
+    schedule_followup(lead_id, delay_hours, "reminder_24h_before")
+
+
 def schedule_followup(lead_id: str, delay_hours: float, kind: str) -> None:
     """Create a Cloud Tasks task to call /internal/tasks/{kind}?lead_id=..."""
     client = _get_tasks_client()

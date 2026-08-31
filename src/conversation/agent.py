@@ -1,10 +1,9 @@
 """
-Conversation agent — wraps Gemini 1.5 Flash to qualify leads over WhatsApp.
+Conversation agent — wraps Gemini to qualify leads over Telegram.
 """
 from __future__ import annotations
 
 import json
-import os
 import re
 from typing import TYPE_CHECKING
 
@@ -12,9 +11,10 @@ if TYPE_CHECKING:
     from src.data.models import Lead, Message
 
 from src.data.models import ConversationResult
+from src.integrations.gemini_client import generate_text
 
 _SYSTEM_PROMPT = """You are a real estate lead qualification assistant messaging a prospective
-buyer over WhatsApp on behalf of a property agency. Your job in this
+buyer over Telegram on behalf of a property agency. Your job in this
 conversation is to naturally gather three things, one or two at a time,
 never all at once:
 
@@ -27,7 +27,7 @@ RULES
   send a numbered list of questions. Ask one natural question per message.
 - Mirror the lead's language and tone (formal/informal) and reply in
   whichever language they write in.
-- Keep every message under ~3 sentences. This is WhatsApp, not email.
+- Keep every message under ~3 sentences. This is chat, not email.
 - Never invent property listings, prices, or availability you don't have.
   If asked something outside your scope, say a human will follow up.
 - If the lead's message is a cancellation, reschedule request, or
@@ -38,7 +38,7 @@ RULES
 
 OUTPUT FORMAT — respond with ONLY this JSON object, no other text:
 {
-  "reply_text": "<WhatsApp message to send>",
+  "reply_text": "<message to send>",
   "extracted": {
     "budget": "<number, range as string, or null>",
     "property_preferences": "<string or null>",
@@ -47,19 +47,6 @@ OUTPUT FORMAT — respond with ONLY this JSON object, no other text:
   "intent": "<qualifying | confirm | cancel | reschedule | off_topic>",
   "is_complete": <true if all three fields now known, else false>
 }"""
-
-
-def _get_gemini_model():
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if not api_key:
-        raise EnvironmentError(
-            "GEMINI_API_KEY environment variable is not set. "
-            "Set it before using the conversation agent."
-        )
-    import google.generativeai as genai  # type: ignore
-
-    genai.configure(api_key=api_key)
-    return genai.GenerativeModel("gemini-3.5-flash")
 
 
 def _strip_fences(text: str) -> str:
@@ -96,8 +83,6 @@ def _handle_message_internal(
     incoming_text: str,
 ) -> ConversationResult:
     """Call Gemini and return a structured ConversationResult."""
-    model = _get_gemini_model()
-
     history = _build_history(messages, incoming_text)
     prompt_parts = [_SYSTEM_PROMPT, "\n\nConversation so far:\n"]
     for turn in history[:-1]:
@@ -107,12 +92,10 @@ def _handle_message_internal(
     prompt_parts.append("\nRespond with only the JSON object.")
 
     full_prompt = "\n".join(prompt_parts)
-    response = model.generate_content(full_prompt)
-    raw = _strip_fences(response.text)
+    raw = _strip_fences(generate_text(full_prompt))
     data = json.loads(raw)
 
     extracted = data.get("extracted", {})
-    # Merge extracted fields onto lead for scoring context
     if extracted.get("budget"):
         lead.budget = extracted["budget"]
     if extracted.get("property_preferences"):

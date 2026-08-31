@@ -1,6 +1,7 @@
 """Telegram Bot API client — messages, inline keyboards, callback queries."""
 from __future__ import annotations
 
+import html
 import json
 import logging
 import os
@@ -37,7 +38,7 @@ def _api(method: str, payload: dict) -> dict:
         raise
 
 
-def send_message(chat_id: str | int, text: str, parse_mode: str = "Markdown") -> str:
+def send_message(chat_id: str | int, text: str, parse_mode: str = "HTML") -> str:
     """Send a plain text message. Returns message_id string."""
     try:
         result = _api("sendMessage", {
@@ -55,7 +56,7 @@ def send_inline_keyboard(
     chat_id: str | int,
     text: str,
     buttons: list[list[dict]],
-    parse_mode: str = "Markdown",
+    parse_mode: str = "HTML",
 ) -> str:
     """
     Send a message with an inline keyboard.
@@ -135,9 +136,10 @@ def parse_update(body: dict) -> tuple[str, str, str, str, str]:
 # ---------------------------------------------------------------------------
 
 def send_property_type_buttons(chat_id: str | int, lead_id: str, name: str) -> None:
+    safe_name = html.escape(name)
     send_inline_keyboard(
         chat_id,
-        f"Hi *{name}* 👋 I'm your AI real estate assistant.\n\nWhat type of property are you looking for?",
+        f"Hi <b>{safe_name}</b> — I'm your ZealEstate assistant.\n\nWhat type of property are you looking for?",
         [
             [{"text": "🏢 Apartment", "callback_data": f"pt:{lead_id}:apartment"},
              {"text": "🏡 House",     "callback_data": f"pt:{lead_id}:house"}],
@@ -151,7 +153,7 @@ def send_property_type_buttons(chat_id: str | int, lead_id: str, name: str) -> N
 def send_budget_buttons(chat_id: str | int, lead_id: str) -> None:
     send_inline_keyboard(
         chat_id,
-        "Great choice! What's your approximate *budget*?",
+        "Great choice! What's your approximate <b>budget</b>?",
         [
             [{"text": "Under ₹50L",    "callback_data": f"bd:{lead_id}:lt50L"},
              {"text": "₹50L – ₹1Cr",  "callback_data": f"bd:{lead_id}:50-100L"}],
@@ -165,7 +167,7 @@ def send_budget_buttons(chat_id: str | int, lead_id: str) -> None:
 def send_availability_question(chat_id: str | int, lead_id: str) -> None:
     send_inline_keyboard(
         chat_id,
-        "Almost there! When are you *available* for a quick call or viewing?",
+        "Almost there! When are you <b>available</b> for a quick call or viewing?",
         [
             [{"text": "📅 This week",    "callback_data": f"av:{lead_id}:thisweek"},
              {"text": "📅 Next week",    "callback_data": f"av:{lead_id}:nextweek"}],
@@ -189,9 +191,10 @@ def send_slot_buttons(chat_id: str | int, lead_id: str, slots: list[dict]) -> No
 
 
 def send_booking_confirmation_buttons(chat_id: str | int, lead_id: str, slot_label: str) -> None:
+    safe_label = html.escape(slot_label)
     send_inline_keyboard(
         chat_id,
-        f"✅ *You're confirmed!*\n\n📅 {slot_label}\n\nI'll send a reminder before your call.",
+        f"<b>You're confirmed!</b>\n\n{safe_label}\n\nI'll send a reminder before your call.",
         [
             [{"text": "🔄 Reschedule", "callback_data": f"rs:{lead_id}"},
              {"text": "❌ Cancel",      "callback_data": f"cx:{lead_id}"}],

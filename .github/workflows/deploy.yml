@@ -84,7 +84,7 @@ jobs:
             FROM_EMAIL=${{ secrets.FROM_EMAIL }}
             TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}
             TELEGRAM_BOT_USERNAME=ZealEstateAIBot
-            CALENDAR_ID=${{ secrets.CALENDAR_ID }}
+            CLOUD_RUN_URL=${{ steps.deploy.outputs.url }}
 
       # ── 7. Print the deployed URL ───────────────────────────────────────────
       - name: Show deployed URL

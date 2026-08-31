@@ -174,8 +174,11 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
                             await process_event(lead.lead_id, "slot_confirmed", {"slot": slot})
                         except Exception as exc:
                             log.error("slot booking failed: %s", exc)
+                            tg.send_message(
+                                chat_id,
+                                "Sorry, I couldn't book that slot. Please try another time.",
+                            )
                     background_tasks.add_task(_book)
-                    tg.send_booking_confirmation_buttons(chat_id, lead.lead_id, slot_info["label"])
                 else:
                     tg.send_message(chat_id, "Sorry, that slot is no longer available. Let me find new ones.")
                     await process_event(lead.lead_id, "reschedule_requested", {})

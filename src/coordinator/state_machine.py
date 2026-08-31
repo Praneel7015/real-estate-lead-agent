@@ -64,13 +64,17 @@ _TRANSITIONS: dict[tuple[str, str], tuple[str, list[str]]] = {
     ),
     ("RESCHEDULE_REQUESTED", "slot_confirmed"): (
         "BOOKED",
-        ["book_slot", "schedule_reminder", "cancel_nudges"],
+        ["reschedule_slot", "schedule_reminder", "cancel_nudges"],
     ),
     ("RESCHEDULE_REQUESTED", "inbound_message"): (
         "RESCHEDULE_REQUESTED",
         ["invoke_conversation_agent"],
     ),
     ("REMINDED", "meeting_done"): (
+        "DONE",
+        ["alert_salesperson"],
+    ),
+    ("BOOKED", "meeting_done"): (
         "DONE",
         ["alert_salesperson"],
     ),

@@ -89,7 +89,7 @@ NEW ──[lead_created]──► CONTACTED ──[intake_complete]──► SCO
 
 | Layer | Technology |
 |---|---|
-| LLM | Gemini 3.5 Flash (google-generativeai GenAI SDK) |
+| LLM | Gemini 2.0 Flash (`google-genai` GenAI SDK) |
 | Backend | FastAPI + Python 3.11 on Cloud Run |
 | Database | Google Cloud Firestore (Native mode) |
 | Async tasks | Google Cloud Tasks |
@@ -142,9 +142,10 @@ Lead intake form: open `frontend/lead-form/index.html` in a browser
 | Variable | Description |
 |---|---|
 | `GOOGLE_CLOUD_PROJECT` | GCP project ID |
-| `GEMINI_API_KEY` | From Google AI Studio (uses gemini-3.5-flash) |
+| `GEMINI_API_KEY` | From Google AI Studio (uses `google-genai` SDK) |
 | `TELEGRAM_BOT_TOKEN` | From @BotFather |
 | `TELEGRAM_BOT_USERNAME` | Your bot's username (no @) |
+| `CLOUD_RUN_URL` | Deployed Cloud Run URL (required for Cloud Tasks callbacks) |
 | `CALENDAR_ID` | Google Calendar ID (share calendar with service account first) |
 | `SALESPERSON_EMAIL` | Email to alert when meeting is done |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `FROM_EMAIL` | Email config for salesperson alerts |

@@ -50,7 +50,8 @@ class TestHappyPathTransitions:
         lead = _lead("REPLIED")
         new_state, actions = transition(lead, "is_complete_true", {"is_complete": False})
         assert new_state == "AWAITING_REPLY"
-        assert "invoke_conversation_agent" in actions
+        assert "schedule_24h_nudge" in actions
+        assert "invoke_conversation_agent" not in actions
 
     def test_replied_is_complete_true(self):
         lead = _lead("REPLIED")
@@ -63,7 +64,7 @@ class TestHappyPathTransitions:
         new_state, actions = transition(lead, "scored", {})
         assert new_state == "SLOT_OFFERED"
         assert "find_slots" in actions
-        assert "send_slots_message" in actions
+        assert "send_slots_message" not in actions
 
     def test_slot_offered_confirmed(self):
         lead = _lead("SLOT_OFFERED")
@@ -102,9 +103,15 @@ class TestHappyPathTransitions:
         lead = _lead("RESCHEDULE_REQUESTED")
         new_state, actions = transition(lead, "slot_confirmed", {})
         assert new_state == "BOOKED"
-        assert "book_slot" in actions
+        assert "reschedule_slot" in actions
         assert "schedule_reminder" in actions
         assert "cancel_nudges" in actions
+
+    def test_booked_meeting_done(self):
+        lead = _lead("BOOKED")
+        new_state, actions = transition(lead, "meeting_done", {})
+        assert new_state == "DONE"
+        assert "alert_salesperson" in actions
 
     def test_reschedule_requested_inbound_message(self):
         lead = _lead("RESCHEDULE_REQUESTED")

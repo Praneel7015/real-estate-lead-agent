@@ -3,312 +3,364 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Find Your Dream Property</title>
+  <title>ZealEstate — Request a Viewing</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --paper: #EDE8DF;
+      --ink: #1A1714;
+      --brass: #8A734A;
+      --brass-dark: #6E5A38;
+      --rule: rgba(26, 23, 20, 0.12);
+      --error: #8B2E2E;
+    }
+
     body {
-      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      font-family: 'Source Serif 4', Georgia, serif;
+      background: var(--paper);
+      color: var(--ink);
       min-height: 100vh;
+      line-height: 1.55;
+    }
+
+    .spread {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 100vh;
+    }
+
+    .photo-panel {
+      position: relative;
+      min-height: 100vh;
+      background: #2a2620 url('https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&q=80') center/cover no-repeat;
+    }
+    /* Photo: Unsplash — modern stone facade, architectural still */
+    .photo-panel::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(26,23,20,0.15) 0%, rgba(26,23,20,0.55) 100%);
+    }
+    .photo-caption {
+      position: absolute;
+      bottom: 2rem;
+      left: 2rem;
+      right: 2rem;
+      z-index: 1;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: rgba(237, 232, 223, 0.85);
+    }
+
+    .form-panel {
       display: flex;
-      align-items: center;
+      flex-direction: column;
       justify-content: center;
-      padding: 1.5rem;
+      padding: 3rem 3.5rem;
+      border-left: 1px solid var(--rule);
     }
 
-    .card {
-      background: #ffffff;
-      border-radius: 20px;
-      padding: 2.5rem;
-      width: 100%;
-      max-width: 480px;
-      box-shadow: 0 25px 60px rgba(0,0,0,0.4);
+    .masthead {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.65rem;
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--brass);
+      margin-bottom: 1.5rem;
     }
-
-    .logo {
-      display: flex;
-      align-items: center;
-      gap: 0.6rem;
-      margin-bottom: 1.8rem;
-    }
-    .logo-icon {
-      width: 40px; height: 40px;
-      background: linear-gradient(135deg, #e94560, #0f3460);
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      color: white; font-size: 1.2rem;
-    }
-    .logo-text { font-size: 1.1rem; font-weight: 700; color: #1a1a2e; }
-    .logo-sub  { font-size: 0.7rem; color: #888; letter-spacing: 0.05em; text-transform: uppercase; }
 
     h1 {
-      font-size: 1.6rem;
-      font-weight: 800;
-      color: #1a1a2e;
-      margin-bottom: 0.4rem;
-      line-height: 1.2;
-    }
-    .subtitle {
-      color: #666;
-      font-size: 0.9rem;
-      margin-bottom: 2rem;
-      line-height: 1.5;
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: clamp(1.75rem, 3vw, 2.25rem);
+      font-weight: 600;
+      font-variation-settings: 'opsz' 72;
+      line-height: 1.15;
+      margin-bottom: 0.75rem;
+      color: var(--ink);
     }
 
-    .field { margin-bottom: 1.2rem; }
+    .lede {
+      font-size: 0.95rem;
+      color: rgba(26, 23, 20, 0.72);
+      margin-bottom: 2rem;
+      max-width: 28rem;
+    }
+
+    .field { margin-bottom: 1.25rem; }
+
     label {
       display: block;
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: #444;
-      margin-bottom: 0.35rem;
-      letter-spacing: 0.02em;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.68rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--brass);
+      margin-bottom: 0.4rem;
     }
-    .required { color: #e94560; margin-left: 2px; }
 
-    input, textarea, select {
+    input, textarea {
       width: 100%;
-      padding: 0.75rem 1rem;
-      border: 2px solid #e8e8e8;
-      border-radius: 10px;
-      font-size: 0.95rem;
-      font-family: inherit;
-      color: #1a1a2e;
-      background: #fafafa;
-      transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+      padding: 0.65rem 0;
+      border: none;
+      border-bottom: 1px solid var(--rule);
+      border-radius: 0;
+      font-family: 'Source Serif 4', Georgia, serif;
+      font-size: 1rem;
+      color: var(--ink);
+      background: transparent;
       outline: none;
+      transition: border-color 0.2s;
       resize: none;
     }
-    input:focus, textarea:focus, select:focus {
-      border-color: #0f3460;
-      background: #fff;
-      box-shadow: 0 0 0 4px rgba(15,52,96,0.08);
+    input:focus, textarea:focus {
+      border-bottom-color: var(--brass);
     }
-    .phone-row { display: flex; gap: 0.5rem; }
+    input::placeholder, textarea::placeholder {
+      color: rgba(26, 23, 20, 0.35);
+    }
+
+    .phone-row { display: flex; gap: 0.75rem; align-items: flex-end; }
     .phone-prefix {
-      width: 90px; flex-shrink: 0;
-      appearance: none; cursor: pointer;
+      width: 5.5rem;
+      flex-shrink: 0;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.85rem;
+      cursor: pointer;
     }
+
+    .field-error {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.75rem;
+      color: var(--error);
+      margin-top: 0.35rem;
+      display: none;
+    }
+    .field.has-error input,
+    .field.has-error textarea { border-bottom-color: var(--error); }
+    .field.has-error .field-error { display: block; }
 
     .submit-btn {
-      width: 100%;
-      padding: 0.9rem;
-      background: linear-gradient(135deg, #e94560, #c0283e);
-      color: white;
+      margin-top: 1.5rem;
+      padding: 0.85rem 1.5rem;
+      background: var(--ink);
+      color: var(--paper);
       border: none;
-      border-radius: 12px;
-      font-size: 1rem;
-      font-weight: 700;
+      border-radius: 2px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
       cursor: pointer;
-      margin-top: 0.5rem;
-      transition: transform 0.15s, box-shadow 0.15s;
-      letter-spacing: 0.03em;
+      transition: background 0.2s;
     }
-    .submit-btn:hover:not(:disabled) {
-      transform: translateY(-1px);
-      box-shadow: 0 8px 20px rgba(233,69,96,0.4);
-    }
-    .submit-btn:active { transform: translateY(0); }
-    .submit-btn:disabled { opacity: 0.6; cursor: not-allowed; }
-
-    .spinner {
-      display: inline-block;
-      width: 16px; height: 16px;
-      border: 2px solid rgba(255,255,255,0.4);
-      border-top-color: white;
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
-      vertical-align: middle;
-      margin-right: 6px;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .toast {
-      display: none;
-      margin-top: 1.2rem;
-      padding: 1rem 1.2rem;
-      border-radius: 10px;
-      font-size: 0.9rem;
-      line-height: 1.5;
-    }
-    .toast.success {
-      display: block;
-      background: #f0fff4;
-      border: 1.5px solid #38a169;
-      color: #276749;
-    }
-    .toast.error {
-      display: block;
-      background: #fff5f5;
-      border: 1.5px solid #e53e3e;
-      color: #9b2c2c;
-    }
-    .toast-icon { font-size: 1.3rem; vertical-align: middle; margin-right: 6px; }
+    .submit-btn:hover:not(:disabled) { background: var(--brass-dark); }
+    .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .privacy {
-      text-align: center;
-      font-size: 0.75rem;
-      color: #aaa;
-      margin-top: 1.2rem;
-      line-height: 1.5;
+      margin-top: 1.5rem;
+      font-size: 0.8rem;
+      color: rgba(26, 23, 20, 0.5);
+      max-width: 24rem;
     }
-    .privacy a { color: #0f3460; text-decoration: none; }
+
+    /* Success panel */
+    .success-panel { display: none; }
+    .success-panel.visible { display: block; }
+    .form-content.hidden { display: none; }
+
+    .success-panel h2 {
+      font-family: 'Fraunces', Georgia, serif;
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+    }
+    .success-panel p {
+      margin-bottom: 1rem;
+      color: rgba(26, 23, 20, 0.8);
+    }
+    .tg-btn {
+      display: inline-block;
+      margin-top: 0.5rem;
+      padding: 0.85rem 1.5rem;
+      background: var(--ink);
+      color: var(--paper);
+      text-decoration: none;
+      border-radius: 2px;
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .tg-btn:hover { background: var(--brass-dark); }
+
+    .form-error {
+      font-family: 'IBM Plex Sans', sans-serif;
+      font-size: 0.8rem;
+      color: var(--error);
+      margin-top: 1rem;
+      display: none;
+    }
+    .form-error.visible { display: block; }
+
+    @media (max-width: 768px) {
+      .spread { grid-template-columns: 1fr; }
+      .photo-panel { min-height: 40vh; }
+      .form-panel {
+        border-left: none;
+        border-top: 1px solid var(--rule);
+        padding: 2rem 1.5rem 3rem;
+      }
+    }
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="logo">
-      <div class="logo-icon">&#127968;</div>
-      <div>
-        <div class="logo-text">PropAgent AI</div>
-        <div class="logo-sub">Real Estate Lead System</div>
+  <div class="spread">
+    <aside class="photo-panel" aria-hidden="true">
+      <p class="photo-caption">Private viewings by appointment</p>
+    </aside>
+
+    <main class="form-panel">
+      <p class="masthead">Zeal Estate</p>
+
+      <div class="form-content" id="formContent">
+        <h1>Request a viewing</h1>
+        <p class="lede">Share a few details and our agent will continue the conversation on Telegram — at your pace.</p>
+
+        <form id="leadForm" novalidate>
+          <div class="field" id="fieldName">
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" placeholder="Your full name" required autocomplete="name" />
+            <span class="field-error">Please enter your name.</span>
+          </div>
+
+          <div class="field" id="fieldPhone">
+            <label for="phone">Phone (for your agent)</label>
+            <div class="phone-row">
+              <select class="phone-prefix" id="countryCode" name="countryCode" aria-label="Country code">
+                <option value="+1">+1</option>
+                <option value="+44">+44</option>
+                <option value="+91" selected>+91</option>
+                <option value="+971">+971</option>
+                <option value="+65">+65</option>
+              </select>
+              <input type="tel" id="phone" name="phone" placeholder="9876543210" required autocomplete="tel" style="flex:1" />
+            </div>
+            <span class="field-error">Please enter a valid phone number.</span>
+          </div>
+
+          <div class="field" id="fieldLooking">
+            <label for="looking_for">What you are looking for</label>
+            <textarea id="looking_for" name="looking_for" rows="3"
+              placeholder="e.g. 3-bedroom apartment, south-facing, parking essential" required></textarea>
+            <span class="field-error">Please describe what you're looking for.</span>
+          </div>
+
+          <div class="field">
+            <label for="budget">Budget</label>
+            <input type="text" id="budget" name="budget" placeholder="e.g. ₹80L – ₹1Cr" autocomplete="off" />
+          </div>
+
+          <button type="submit" class="submit-btn" id="submitBtn">Request viewing</button>
+          <p class="form-error" id="formError"></p>
+        </form>
+
+        <p class="privacy">By submitting, you agree to be contacted on Telegram. We do not share your details with third parties.</p>
       </div>
-    </div>
 
-    <h1>Find Your Dream Property</h1>
-    <p class="subtitle">Tell us what you're looking for and our AI assistant will reach out via WhatsApp to help.</p>
-
-    <form id="leadForm" novalidate>
-      <div class="field">
-        <label for="name">Full Name <span class="required">*</span></label>
-        <input type="text" id="name" name="name" placeholder="e.g. Sarah Johnson" required autocomplete="name" />
+      <div class="success-panel" id="successPanel">
+        <h2>Thank you</h2>
+        <p id="successGreeting">Your request has been received.</p>
+        <p>Continue on Telegram to complete your property preferences and book a viewing time with our AI assistant.</p>
+        <a href="#" class="tg-btn" id="tgLink" target="_blank" rel="noopener">Continue on Telegram</a>
       </div>
-
-      <div class="field">
-        <label for="phone">WhatsApp Number <span class="required">*</span></label>
-        <div class="phone-row">
-          <select class="phone-prefix" id="countryCode" name="countryCode">
-            <option value="+1">🇺🇸 +1</option>
-            <option value="+44">🇬🇧 +44</option>
-            <option value="+91" selected>🇮🇳 +91</option>
-            <option value="+971">🇦🇪 +971</option>
-            <option value="+65">🇸🇬 +65</option>
-            <option value="+61">🇦🇺 +61</option>
-            <option value="+49">🇩🇪 +49</option>
-            <option value="+33">🇫🇷 +33</option>
-            <option value="+55">🇧🇷 +55</option>
-            <option value="+27">🇿🇦 +27</option>
-          </select>
-          <input type="tel" id="phone" name="phone" placeholder="9876543210" required autocomplete="tel" style="flex:1" />
-        </div>
-      </div>
-
-      <div class="field">
-        <label for="looking_for">What are you looking for? <span class="required">*</span></label>
-        <textarea id="looking_for" name="looking_for" rows="3"
-          placeholder="e.g. 3-bedroom apartment near good schools, south-facing, parking essential"
-          required></textarea>
-      </div>
-
-      <div class="field">
-        <label for="budget">Approximate Budget</label>
-        <input type="text" id="budget" name="budget" placeholder="e.g. $400k–$500k or ₹80L–₹1Cr" autocomplete="off" />
-      </div>
-
-      <button type="submit" class="submit-btn" id="submitBtn">
-        Get AI-Powered Assistance &#10148;
-      </button>
-
-      <div class="toast" id="toast"></div>
-    </form>
-
-    <p class="privacy">
-      By submitting you agree to be contacted via WhatsApp. We respect your privacy &amp;
-      never share your data. <a href="#">Privacy Policy</a>
-    </p>
+    </main>
   </div>
 
   <script>
     const form = document.getElementById('leadForm');
-    const btn  = document.getElementById('submitBtn');
-    const toast = document.getElementById('toast');
-
-    // Point to your deployed backend; defaults to same origin for local dev
+    const btn = document.getElementById('submitBtn');
+    const formContent = document.getElementById('formContent');
+    const successPanel = document.getElementById('successPanel');
+    const formError = document.getElementById('formError');
     const API_BASE = 'https://real-estate-lead-agent-637tks4tda-uc.a.run.app';
+
+    function clearErrors() {
+      document.querySelectorAll('.field.has-error').forEach(el => el.classList.remove('has-error'));
+      formError.classList.remove('visible');
+      formError.textContent = '';
+    }
+
+    function setFieldError(fieldId) {
+      document.getElementById(fieldId).classList.add('has-error');
+    }
 
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      toast.className = 'toast';
-      toast.textContent = '';
+      clearErrors();
 
-      const name       = document.getElementById('name').value.trim();
+      const name = document.getElementById('name').value.trim();
       const countryCode = document.getElementById('countryCode').value;
-      const phoneRaw   = document.getElementById('phone').value.trim().replace(/\D/g, '');
+      const phoneRaw = document.getElementById('phone').value.trim().replace(/\D/g, '');
       const lookingFor = document.getElementById('looking_for').value.trim();
-      const budget     = document.getElementById('budget').value.trim();
+      const budget = document.getElementById('budget').value.trim();
 
-      if (!name || !phoneRaw || !lookingFor) {
-        showToast('error', '&#9888;&#65039; Please fill in all required fields.');
-        return;
-      }
+      let valid = true;
+      if (!name) { setFieldError('fieldName'); valid = false; }
+      if (!phoneRaw) { setFieldError('fieldPhone'); valid = false; }
+      if (!lookingFor) { setFieldError('fieldLooking'); valid = false; }
+      if (!valid) return;
 
       const phone = countryCode + phoneRaw;
-
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Submitting…';
-
-      // If the server takes >4s it is likely cold-starting — reassure the user
-      const warmingTimer = setTimeout(() => {
-        if (btn.disabled) btn.innerHTML = '<span class="spinner"></span> Warming up server…';
-      }, 4000);
+      btn.textContent = 'Submitting…';
 
       try {
-        const payload = {
-          name,
-          phone,
-          property_preferences: lookingFor,
-          budget: budget || null,
-        };
-
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 90000); // 90s max
-
         const res = await fetch(`${API_BASE}/leads`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-          signal: controller.signal,
+          body: JSON.stringify({
+            name,
+            phone,
+            property_preferences: lookingFor,
+            budget: budget || null,
+          }),
         });
-        clearTimeout(timer);
 
         if (res.ok) {
           const data = await res.json();
-          const leadId = data.lead_id;
-          const botUsername = 'ZealEstateAIBot';
-          const tgLink = `https://t.me/${botUsername}?start=${leadId}`;
-          showToast('success',
-            `✅ You're all set, ${name}!<br><br>` +
-            `<strong>Next step:</strong> Tap the button below to start your AI property search on Telegram.<br><br>` +
-            `<a href="${tgLink}" target="_blank" style="display:inline-block;background:#229ED9;color:white;padding:10px 20px;border-radius:8px;text-decoration:none;font-weight:600;margin-top:4px;">` +
-            `📱 Open Telegram Chat</a>`
-          );
-          form.reset();
+          const tgUrl = `https://t.me/ZealEstateAIBot?start=${data.lead_id}`;
+          document.getElementById('successGreeting').textContent =
+            `${name}, your request has been received.`;
+          document.getElementById('tgLink').href = tgUrl;
+          formContent.classList.add('hidden');
+          successPanel.classList.add('visible');
         } else {
-          let detail = `HTTP ${res.status} ${res.statusText}`;
+          let detail = `HTTP ${res.status}`;
           try {
             const errBody = await res.json();
             detail = errBody.detail || JSON.stringify(errBody);
-          } catch (_) {
-            const text = await res.text().catch(() => '');
-            if (text) detail += ` — ${text.slice(0, 200)}`;
-          }
-          showToast('error', `&#10060; Submission failed: ${detail}`);
+          } catch (_) {}
+          formError.textContent = `Submission failed: ${detail}`;
+          formError.classList.add('visible');
         }
       } catch (err) {
-        showToast('error', `&#10060; Could not reach server: ${err.message || 'network error (possible CORS). Check console.'}`);
+        formError.textContent = `Could not reach server: ${err.message || 'network error'}`;
+        formError.classList.add('visible');
       } finally {
-        clearTimeout(warmingTimer);
         btn.disabled = false;
-        btn.innerHTML = 'Get AI-Powered Assistance &#10148;';
+        btn.textContent = 'Request viewing';
       }
     });
-
-    function showToast(type, html) {
-      toast.className = `toast ${type}`;
-      toast.innerHTML = html;
-      toast.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
   </script>
 </body>
 </html>
