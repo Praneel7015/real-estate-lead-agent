@@ -59,7 +59,7 @@ def _get_gemini_model():
     import google.generativeai as genai  # type: ignore
 
     genai.configure(api_key=api_key)
-    return genai.GenerativeModel("gemini-2.5-flash")
+    return genai.GenerativeModel("gemini-3.5-flash")
 
 
 def _strip_fences(text: str) -> str:

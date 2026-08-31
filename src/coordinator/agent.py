@@ -64,7 +64,7 @@ def _llm_resolve(lead: Lead, event: str, payload: dict) -> CoordinatorDecision:
     import google.generativeai as genai  # type: ignore
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
 
     context = (
         f"{_COORDINATOR_PROMPT}\n\n"

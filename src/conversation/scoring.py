@@ -54,7 +54,7 @@ def _gemini_reason(lead: "Lead", score: str) -> str:
     import google.generativeai as genai  # type: ignore
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.5-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
 
     prompt = _SCORING_PROMPT_TEMPLATE.format(
         budget=lead.budget or "unknown",
