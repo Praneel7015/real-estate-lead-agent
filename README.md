@@ -1,124 +1,253 @@
-# Real Estate Lead Agent
+# ZealEstate AI — Autonomous Real Estate Lead Agent
 
-An AI-powered real estate lead qualification and appointment scheduling system. The system automatically contacts new leads via WhatsApp, qualifies them through natural conversation (gathering budget, preferences, and availability), scores them, books calendar appointments, sends reminders, and alerts the salesperson when a meeting is complete.
+> **Live Demo:** https://praneel7015.github.io/real-estate-lead-agent  
+> **API:** https://real-estate-lead-agent-637tks4tda-uc.a.run.app/docs  
+> **Telegram Bot:** [@ZealEstateAIBot](https://t.me/ZealEstateAIBot)
 
-## Architecture Overview
+An autonomous multi-agent AI system that handles the **entire real estate lead lifecycle** — from first contact to booked meeting — with **zero human intervention**. Built on Gemini, Google Cloud Run, Firestore, and the Telegram Bot API.
 
-The system is a multi-agent pipeline orchestrated by a deterministic state machine. When a new lead arrives, the **Coordinator** fires `lead_created`, transitions the lead through states (`NEW → CONTACTED → AWAITING_REPLY → REPLIED → SCORED → SLOT_OFFERED → BOOKED → REMINDED → DONE`), and dispatches work to specialist agents:
+---
 
-- **Conversation Agent** (Gemini 2.0 Flash): Qualifies leads over WhatsApp, extracting budget, property preferences, and availability.
-- **Scoring Module**: Rule-based scoring (HIGH/MEDIUM/LOW) with Gemini-generated reason sentence.
-- **Scheduling Agent** (Gemini + Google Calendar): Finds free slots, books appointments, sends WhatsApp scheduling messages.
-- **Twilio**: Sends and receives WhatsApp messages.
-- **Cloud Tasks**: Handles 24h/72h follow-up nudges and 24h-before appointment reminders.
-- **Firestore**: Persists lead state, messages, and appointments.
+## Architecture
 
-See [`plan.md`](plan.md) for a full architecture diagram and state machine reference.
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         LEAD INTAKE                                  │
+│  GitHub Pages Form  ──►  POST /leads  ──►  Firestore (leads)        │
+│                                 │                                    │
+│                         Telegram deep-link shown to user             │
+└─────────────────────────────────┬───────────────────────────────────┘
+                                  │
+                    ┌─────────────▼─────────────┐
+                    │    COORDINATOR AGENT       │
+                    │  (Cloud Run / FastAPI)     │
+                    │                           │
+                    │  Deterministic State       │
+                    │  Machine:                  │
+                    │  NEW → CONTACTED →         │
+                    │  REPLIED → SCORED →        │
+                    │  SLOT_OFFERED → BOOKED →   │
+                    │  REMINDED → DONE           │
+                    └──┬──────────┬─────────────┘
+                       │          │
+          ┌────────────▼──┐  ┌───▼──────────────────┐
+          │  CONVERSATION  │  │   SCHEDULING AGENT   │
+          │  AGENT         │  │                      │
+          │  Gemini Flash  │  │  Gemini Flash        │
+          │                │  │  + Google Calendar   │
+          │  Qualifies     │  │                      │
+          │  lead via      │  │  Finds free slots,   │
+          │  Telegram:     │  │  books appointments, │
+          │  • Budget      │  │  sends reminders     │
+          │  • Preferences │  └──────────┬───────────┘
+          │  • Availability│             │
+          │  • Scoring     │   ┌─────────▼──────────┐
+          └────────┬───────┘   │  Google Calendar   │
+                   │           │  (real events)     │
+          ┌────────▼───────┐   └────────────────────┘
+          │  Telegram Bot  │
+          │  @ZealEstateAI │  Inline keyboards for:
+          │                │  • Property type
+          │                │  • Budget range
+          │                │  • Availability
+          │                │  • Slot selection
+          └────────────────┘
 
-## Prerequisites
+     ASYNC LAYER                    PERSISTENCE
+  ┌──────────────────┐         ┌──────────────────┐
+  │  Cloud Tasks     │         │    Firestore      │
+  │  • 24h nudge     │         │  • leads          │
+  │  • 72h stale     │         │  • messages       │
+  │  • 24h reminder  │         │  • appointments   │
+  └──────────────────┘         └──────────────────┘
+```
 
-1. **GCP Project** with these APIs enabled:
-   - Firestore (Native mode)
-   - Cloud Tasks
-   - Google Calendar API
-   - Cloud Run (for deployment)
-2. **Service Account** with roles: `roles/datastore.user`, `roles/cloudtasks.enqueuer`, `roles/calendar.app.created`
-3. **Gemini API Key** from [Google AI Studio](https://aistudio.google.com/app/apikey)
-4. **Twilio account** with WhatsApp Sandbox enabled (see [WhatsApp Sandbox setup](docs/whatsapp-sandbox.md))
-5. **Python 3.11+**
+### State Machine
+```
+NEW ──[lead_created]──► CONTACTED ──[intake_complete]──► SCORED
+                            │                               │
+                     [timer_24h]                    [invoke_scoring]
+                            ▼                               ▼
+                     AWAITING_REPLY              SLOT_OFFERED
+                            │                       │         │
+                    [inbound_msg]            [confirmed]  [reschedule]
+                            ▼                   ▼               ▼
+                         REPLIED             BOOKED    RESCHEDULE_REQUESTED
+                            │                  │
+                   [is_complete=true]     [timer_reminder]
+                            ▼                  ▼
+                          SCORED           REMINDED
+                                               │
+                                        [meeting_done]
+                                               ▼
+                                             DONE ──► salesperson_alerted
+```
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| LLM | Gemini 2.5 Flash (google-generativeai SDK) |
+| Backend | FastAPI + Python 3.11 on Cloud Run |
+| Database | Google Cloud Firestore (Native mode) |
+| Async tasks | Google Cloud Tasks |
+| Calendar | Google Calendar API (ADC via service account) |
+| Messaging | Telegram Bot API |
+| Frontend | GitHub Pages (static HTML) |
+| CI/CD | GitHub Actions |
+| Auth | Service Account + ADC (no key files) |
+
+---
 
 ## Local Setup
 
+### Prerequisites
+- Python 3.11+
+- GCP project with Firestore (Native mode) enabled
+- Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
+- Telegram Bot token from [@BotFather](https://t.me/BotFather)
+
+### Run locally
+
 ```bash
-# Clone and enter the project
-cd real-estate-agent
+# 1. Clone the repo
+git clone https://github.com/Praneel7015/real-estate-lead-agent.git
+cd real-estate-lead-agent
 
-# Create and activate a virtual environment
+# 2. Create virtual environment
 python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # macOS/Linux
+# Windows:
+.venv\Scripts\activate
+# macOS/Linux:
+source .venv/bin/activate
 
-# Install dependencies
+# 3. Install dependencies
 pip install -r requirements.txt
 
-# Configure environment variables
+# 4. Set environment variables
 cp .env.example .env
-# Edit .env with your actual values
+# Edit .env with your values (see required vars below)
 
-# Load env vars and run the server
+# 5. Run the server
 uvicorn src.main:app --reload --port 8000
 ```
 
-The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+API docs available at `http://localhost:8000/docs`  
+Lead intake form: open `frontend/lead-form/index.html` in a browser
 
-Open `frontend/lead-form/index.html` in a browser to test the lead intake form.
+### Required environment variables
 
-## Joining the Twilio WhatsApp Sandbox
+| Variable | Description |
+|---|---|
+| `GOOGLE_CLOUD_PROJECT` | GCP project ID |
+| `GEMINI_API_KEY` | From Google AI Studio (uses Gemini 2.5 Flash) |
+| `TELEGRAM_BOT_TOKEN` | From @BotFather |
+| `TELEGRAM_BOT_USERNAME` | Your bot's username (no @) |
+| `CALENDAR_ID` | Google Calendar ID (share calendar with service account first) |
+| `SALESPERSON_EMAIL` | Email to alert when meeting is done |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `FROM_EMAIL` | Email config for salesperson alerts |
+| `CLOUD_TASKS_QUEUE` | Cloud Tasks queue name |
+| `CLOUD_TASKS_LOCATION` | Cloud Tasks region (e.g. `us-central1`) |
 
-See [`docs/whatsapp-sandbox.md`](docs/whatsapp-sandbox.md) for step-by-step sandbox setup. Key steps:
-
-1. Sign in to [Twilio Console](https://console.twilio.com) → Messaging → Try WhatsApp
-2. Send the join code from your phone to the sandbox number
-3. Set the webhook URL to `https://your-service.run.app/webhook/twilio`
-4. Set `TWILIO_WHATSAPP_FROM=whatsapp:+14155238886` in your `.env`
+---
 
 ## Cloud Run Deployment
 
-```bash
-# Build the Docker image locally
-docker build -t real-estate-agent .
+Deployment is fully automated via **GitHub Actions** on every push to `master`.
 
-# Build and push container via Cloud Build
-gcloud builds submit --tag gcr.io/$PROJECT_ID/real-estate-agent
-
-# Deploy to Cloud Run
-gcloud run deploy real-estate-agent \
-  --image gcr.io/$PROJECT_ID/real-estate-agent \
-  --platform managed \
-  --allow-unauthenticated
-
-# Full deploy with environment variables
-gcloud run deploy real-estate-agent \
-  --image gcr.io/$PROJECT_ID/real-estate-agent \
-  --platform managed \
-  --region us-central1 \
-  --allow-unauthenticated \
-  --set-env-vars GOOGLE_CLOUD_PROJECT=$PROJECT_ID \
-  --set-env-vars GEMINI_API_KEY=$GEMINI_API_KEY \
-  --set-env-vars TWILIO_ACCOUNT_SID=$TWILIO_ACCOUNT_SID \
-  --set-env-vars TWILIO_AUTH_TOKEN=$TWILIO_AUTH_TOKEN \
-  --set-env-vars SALESPERSON_EMAIL=$SALESPERSON_EMAIL
-```
-
-Update `CLOUD_RUN_URL` in `.env` with the deployed service URL.
-
-## Running Tests
+### One-time GCP setup
 
 ```bash
-# From the real-estate-agent directory
-python -m pytest tests/ -v
+# 1. Enable required APIs
+gcloud services enable \
+  run.googleapis.com \
+  firestore.googleapis.com \
+  cloudtasks.googleapis.com \
+  calendar-json.googleapis.com \
+  artifactregistry.googleapis.com \
+  --project=YOUR_PROJECT_ID
+
+# 2. Create service account
+gcloud iam service-accounts create real-estate-agent-sa \
+  --project=YOUR_PROJECT_ID
+
+# 3. Grant roles
+for ROLE in roles/datastore.user roles/cloudtasks.enqueuer \
+            roles/run.admin roles/artifactregistry.writer \
+            roles/iam.serviceAccountUser; do
+  gcloud projects add-iam-policy-binding YOUR_PROJECT_ID \
+    --member="serviceAccount:real-estate-agent-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com" \
+    --role="$ROLE"
+done
+
+# 4. Create Firestore database
+gcloud firestore databases create --location=us-central1 --project=YOUR_PROJECT_ID
+
+# 5. Create Cloud Tasks queue
+gcloud tasks queues create lead-followups --location=us-central1 --project=YOUR_PROJECT_ID
 ```
 
-Tests cover:
-- Every state machine transition (including invalid transitions)
-- Lead scoring logic (HIGH/MEDIUM/LOW) with mocked Gemini
-- Google Calendar client with mocked API responses
+### GitHub Secrets required
+
+Add these to your repo → Settings → Secrets → Actions:
+
+`GCP_PROJECT_ID`, `GCP_SA_KEY`, `GEMINI_API_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_BOT_USERNAME`, `CALENDAR_ID`, `SALESPERSON_EMAIL`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`, `CLOUD_TASKS_QUEUE`
+
+### Register Telegram webhook (after first deploy)
+
+```powershell
+Invoke-RestMethod `
+  -Uri "https://api.telegram.org/bot<YOUR_TOKEN>/setWebhook" `
+  -Method POST -ContentType "application/json" `
+  -Body '{"url":"https://YOUR_CLOUD_RUN_URL/webhook/telegram","drop_pending_updates":true}'
+```
+
+### Google Calendar setup
+
+1. Enable Calendar API: `gcloud services enable calendar-json.googleapis.com`
+2. Share your Google Calendar with `real-estate-agent-sa@YOUR_PROJECT_ID.iam.gserviceaccount.com` (Make changes to events)
+3. Copy Calendar ID from Calendar Settings → add as `CALENDAR_ID` secret
+
+---
 
 ## API Reference
 
 | Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/health` | Health check |
-| `POST` | `/leads` | Create new lead |
+|---|---|---|
+| `GET` | `/health` | Health check + version |
+| `POST` | `/leads` | Create a new lead |
 | `GET` | `/leads` | List all leads (optional `?state=BOOKED`) |
 | `GET` | `/leads/{lead_id}` | Get lead details |
-| `POST` | `/webhook/twilio` | Twilio inbound WhatsApp webhook |
+| `GET` | `/appointments` | List all booked appointments |
+| `POST` | `/webhook/telegram` | Telegram Bot webhook |
+| `POST` | `/webhook/twilio` | Twilio WhatsApp webhook (legacy) |
 | `POST` | `/internal/tasks/nudge_24h` | 24h follow-up (Cloud Tasks) |
 | `POST` | `/internal/tasks/nudge_72h` | 72h stale check (Cloud Tasks) |
-| `POST` | `/internal/tasks/reminder_24h_before` | Pre-meeting reminder (Cloud Tasks) |
+| `POST` | `/internal/tasks/reminder_24h_before` | Pre-meeting reminder |
 
-## Known Limitations
+---
 
-- **Twilio sandbox**: The sandbox uses a shared WhatsApp number and requires leads to opt-in by sending a join code. Production use requires Meta business API approval via Twilio.
-- **Calendar timezone**: All calendar slots are in UTC. For production, pass timezone info from the lead's location.
-- **Slot confirmation parsing**: The current implementation expects the coordinator to receive a `slot_confirmed` event with a slot payload. A full production system would add NLP to parse the lead's reply and identify the confirmed slot.
+## Running Tests
+
+```bash
+python -m pytest tests/ -v
+```
+
+---
+
+## How It Works (User Journey)
+
+1. **Lead submits form** at the GitHub Pages URL → lead saved to Firestore instantly
+2. **Success page shows a Telegram deep-link** button: "Open Telegram Chat"
+3. **Lead taps Start** in Telegram → bot greets them with inline keyboard buttons
+4. **Guided intake** (no free-text required):
+   - 🏢 Property type buttons
+   - 💰 Budget range buttons  
+   - 📅 Availability buttons
+5. **Gemini scores the lead** (HIGH / MEDIUM / LOW) based on their profile
+6. **Calendar slots appear as buttons** — lead taps one to book
+7. **Appointment created** in Google Calendar + saved to Firestore
+8. **24h reminder sent** before the appointment via Telegram
+9. **Salesperson alerted** by email when meeting is marked done
