@@ -159,29 +159,55 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
 
         elif action_type == "sl":  # slot selected
             try:
-                idx = int(value)
-                offered = lead.offered_slots
-                if 0 <= idx < len(offered):
-                    slot_info = offered[idx]
-                    from src.data.models import TimeSlot
-                    from datetime import datetime as dt
+                from src.data.models import TimeSlot
+                from datetime import datetime as dt, timedelta, timezone
+
+                start_ts = int(value)
+                slot_start = dt.fromtimestamp(start_ts, tz=timezone.utc)
+                slot = None
+                for entry in lead.offered_slots or []:
+                    if entry.get("start_ts") == start_ts:
+                        slot = TimeSlot(
+                            start=slot_start,
+                            end=dt.fromisoformat(entry["end_iso"]),
+                        )
+                        break
+                if slot is None:
+                    for entry in lead.offered_slots or []:
+                        if entry.get("start_iso"):
+                            entry_start = dt.fromisoformat(entry["start_iso"])
+                            if int(entry_start.timestamp()) == start_ts:
+                                slot = TimeSlot(
+                                    start=entry_start,
+                                    end=dt.fromisoformat(entry["end_iso"]),
+                                )
+                                break
+                if slot is None:
                     slot = TimeSlot(
-                        start=dt.fromisoformat(slot_info["start_iso"]),
-                        end=dt.fromisoformat(slot_info["end_iso"]),
+                        start=slot_start,
+                        end=slot_start + timedelta(minutes=30),
                     )
-                    async def _book():
-                        try:
-                            await process_event(lead.lead_id, "slot_confirmed", {"slot": slot})
-                        except Exception as exc:
-                            log.error("slot booking failed: %s", exc)
-                            tg.send_message(
-                                chat_id,
-                                "Sorry, I couldn't book that slot. Please try another time.",
-                            )
-                    background_tasks.add_task(_book)
-                else:
-                    tg.send_message(chat_id, "Sorry, that slot is no longer available. Let me find new ones.")
-                    await process_event(lead.lead_id, "reschedule_requested", {})
+
+                if slot.start < dt.now(tz=timezone.utc):
+                    tg.send_message(
+                        chat_id,
+                        "That time has passed. Let me find fresh slots for you.",
+                    )
+                    async def _refresh():
+                        await process_event(lead.lead_id, "reschedule_requested", {})
+                    background_tasks.add_task(_refresh)
+                    return {"ok": True}
+
+                async def _book():
+                    try:
+                        await process_event(lead.lead_id, "slot_confirmed", {"slot": slot})
+                    except Exception as exc:
+                        log.error("slot booking failed: %s", exc)
+                        tg.send_message(
+                            chat_id,
+                            "Sorry, I couldn't book that slot. Please try another time.",
+                        )
+                background_tasks.add_task(_book)
             except (ValueError, IndexError):
                 tg.send_message(chat_id, "Something went wrong picking that slot. Please try again.")
 

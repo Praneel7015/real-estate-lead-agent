@@ -177,17 +177,25 @@ def send_availability_question(chat_id: str | int, lead_id: str) -> None:
     )
 
 
-def send_slot_buttons(chat_id: str | int, lead_id: str, slots: list[dict]) -> None:
-    """slots: list of {label, start_iso, end_iso}"""
-    rows = [[{"text": s["label"], "callback_data": f"sl:{lead_id}:{i}"}]
-            for i, s in enumerate(slots[:3])]
-    rows.append([{"text": "🔄 None of these — suggest another time",
+def send_slot_buttons(
+    chat_id: str | int,
+    lead_id: str,
+    slots: list[dict],
+    refreshed: bool = False,
+) -> None:
+    """slots: list of {label, start_iso, end_iso, start_ts}"""
+    rows = [
+        [{"text": s["label"], "callback_data": f"sl:{lead_id}:{s['start_ts']}"}]
+        for s in slots[:3]
+    ]
+    rows.append([{"text": "None of these — show more times",
                   "callback_data": f"rs:{lead_id}"}])
-    send_inline_keyboard(
-        chat_id,
-        "📅 Here are some available slots for a quick call. Pick one that works:",
-        rows,
+    intro = (
+        "Here are updated available times — pick one that works:"
+        if refreshed
+        else "Here are available times from the calendar. Pick one that works:"
     )
+    send_inline_keyboard(chat_id, intro, rows)
 
 
 def send_booking_confirmation_buttons(chat_id: str | int, lead_id: str, slot_label: str) -> None:

@@ -102,16 +102,17 @@ class TestTelegramCallbacks:
     ):
         sample_lead.offered_slots = [
             {
-                "label": "Mon 01 Sep, 10:00 AM",
+                "label": "Mon 01 Sep, 10:00 AM IST",
                 "start_iso": "2026-09-01T10:00:00+00:00",
                 "end_iso": "2026-09-01T10:30:00+00:00",
+                "start_ts": 1756711200,
             }
         ]
         mock_get.return_value = sample_lead
         resp = client.post("/webhook/telegram", json={
             "callback_query": {
                 "id": "cq3",
-                "data": f"sl:{sample_lead.lead_id}:0",
+                "data": f"sl:{sample_lead.lead_id}:1756711200",
                 "message": {"chat": {"id": 123456789}},
             }
         })

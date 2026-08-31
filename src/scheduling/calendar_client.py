@@ -26,6 +26,30 @@ logger = logging.getLogger(__name__)
 _SLOT_HOUR_START = 9
 _SLOT_HOUR_END = 18
 _SLOT_DURATION = 30
+_DISPLAY_TZ = "Asia/Kolkata"
+
+
+def _ceil_to_slot(moment: datetime, minutes: int = _SLOT_DURATION) -> datetime:
+    """Round up to the next slot boundary."""
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=timezone.utc)
+    base = moment.replace(second=0, microsecond=0)
+    remainder = base.minute % minutes
+    if remainder == 0:
+        if moment.second == 0 and moment.microsecond == 0:
+            return base
+        return base + timedelta(minutes=minutes)
+    return base + timedelta(minutes=minutes - remainder)
+
+
+def format_slot_label(start: datetime) -> str:
+    """Human-readable slot label in IST for Telegram buttons."""
+    try:
+        from zoneinfo import ZoneInfo
+        local = start.astimezone(ZoneInfo(_DISPLAY_TZ))
+        return local.strftime("%a %d %b, %I:%M %p IST")
+    except Exception:
+        return start.strftime("%a %d %b, %I:%M %p UTC")
 
 
 def _get_service():
@@ -64,11 +88,14 @@ def _parse_dt(value: str | dict) -> datetime:
 
 def _fallback_slots(start: datetime, end: datetime, duration_minutes: int) -> list[TimeSlot]:
     """Generate business-hour slots without hitting the Calendar API."""
+    if start.tzinfo is None:
+        start = start.replace(tzinfo=timezone.utc)
     delta = timedelta(minutes=duration_minutes)
     slots: list[TimeSlot] = []
-    cursor = start.replace(minute=0, second=0, microsecond=0)
+    cursor = _ceil_to_slot(start)
+
     while cursor + delta <= end and len(slots) < 12:
-        if _SLOT_HOUR_START <= cursor.hour < _SLOT_HOUR_END:
+        if cursor >= start and _SLOT_HOUR_START <= cursor.hour < _SLOT_HOUR_END:
             slots.append(TimeSlot(start=cursor, end=cursor + delta))
         cursor += delta
     return slots
@@ -107,10 +134,10 @@ def get_free_slots(
 
         delta = timedelta(minutes=duration_minutes)
         slots: list[TimeSlot] = []
-        cursor = start.replace(minute=0, second=0, microsecond=0)
+        cursor = _ceil_to_slot(start)
 
         while cursor + delta <= end and len(slots) < 12:
-            if _SLOT_HOUR_START <= cursor.hour < _SLOT_HOUR_END:
+            if cursor >= start and _SLOT_HOUR_START <= cursor.hour < _SLOT_HOUR_END:
                 slot_end = cursor + delta
                 overlaps = any(b_s < slot_end and b_e > cursor for b_s, b_e in busy)
                 if not overlaps:

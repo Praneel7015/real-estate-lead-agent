@@ -209,21 +209,28 @@ async def _execute_action(action: str, lead: Lead, payload: dict, **deps) -> Non
         await process_event(lead.lead_id, "scored", {"score": score})
 
     elif action in ("find_slots", "send_slots_message", "send_reschedule_slots"):
+        lead.offered_slots = []
+        fc.save_lead(lead)
         slots = deps["find_slots"](lead.availability)
         if lead.telegram_chat_id and slots:
-            # Build slot list for buttons and store on lead for callback resolution
+            from src.scheduling.calendar_client import format_slot_label
             slot_data = [
                 {
-                    "label": f"📅 {s.start.strftime('%a %d %b, %I:%M %p')}",
+                    "label": format_slot_label(s.start),
                     "start_iso": s.start.isoformat(),
                     "end_iso": s.end.isoformat(),
+                    "start_ts": int(s.start.timestamp()),
                 }
                 for s in slots[:3]
             ]
             lead.offered_slots = slot_data
             fc.save_lead(lead)
             from src.integrations.telegram_client import send_slot_buttons
-            send_slot_buttons(lead.telegram_chat_id, lead.lead_id, slot_data)
+            refreshed = lead.state == "RESCHEDULE_REQUESTED"
+            send_slot_buttons(lead.telegram_chat_id, lead.lead_id, slot_data, refreshed=refreshed)
+        elif lead.telegram_chat_id:
+            _send("No open slots in the next 7 days. A team member will reach out shortly.")
+            _store_outbound(fc, lead, "No open slots in the next 7 days.")
         else:
             msg = deps["build_slot_offer_message"](lead, slots)
             _send(msg)
