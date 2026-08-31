@@ -40,7 +40,7 @@ _TRANSITIONS: dict[tuple[str, str], tuple[str, list[str]]] = {
     ),
     ("SCORED", "scored"): (
         "SLOT_OFFERED",
-        ["find_slots", "send_slots_message"],
+        ["find_slots"],
     ),
     ("SLOT_OFFERED", "slot_confirmed"): (
         "BOOKED",
@@ -93,6 +93,10 @@ def transition(lead: "Lead", event: str, payload: dict) -> tuple[str, list[str]]
         else:
             # Qualification not complete — wait for next inbound; no immediate action
             return "AWAITING_REPLY", ["schedule_24h_nudge"]
+
+    # Telegram button-based intake completion — jump straight to scoring
+    if current == "CONTACTED" and event == "intake_complete":
+        return "SCORED", ["invoke_scoring"]
 
     key = (current, event)
     if key in _TRANSITIONS:

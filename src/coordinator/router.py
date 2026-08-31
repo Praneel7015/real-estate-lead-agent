@@ -146,15 +146,16 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
                 lead.availability = avail_labels.get(value, value)
                 firestore_client.save_lead(lead)
                 tg.send_message(chat_id,
-                    f"Perfect! I have everything I need. Let me find some great property options and available slots for you — one moment! 🔍")
-                async def _score_and_schedule():
+                    "Perfect! I have everything I need. Let me find some available slots for you — one moment! 🔍")
+                async def _intake_complete():
                     try:
-                        await process_event(lead.lead_id, "is_complete_true", {"is_complete": True})
+                        await process_event(lead.lead_id, "intake_complete", {})
                     except Exception as exc:
-                        log.error("score_and_schedule failed for %s: %s", lead.lead_id, exc)
-                background_tasks.add_task(_score_and_schedule)
+                        log.error("intake_complete failed for %s: %s", lead.lead_id, exc)
+                        tg.send_message(chat_id, "Sorry, something went wrong finding slots. Please try again in a moment.")
+                background_tasks.add_task(_intake_complete)
             else:
-                tg.send_message(chat_id, "When works best for you? (e.g. Tuesday evening, this weekend, etc.)")
+                tg.send_message(chat_id, "When works best for you? (e.g. *Tuesday evening*, *this weekend*, *anytime this week*)")
 
         elif action_type == "sl":  # slot selected
             try:
@@ -219,27 +220,35 @@ async def telegram_webhook(request: Request, background_tasks: BackgroundTasks):
     lead.last_reply_at = inbound_msg.timestamp
     firestore_client.save_lead(lead)
 
-    # If still in intake (no budget yet), treat reply as custom budget input
-    if lead.state == "CONTACTED" and not lead.budget:
-        lead.budget = text
-        firestore_client.save_lead(lead)
-        tg.send_availability_question(chat_id, lead.lead_id)
-        return {"ok": True}
+    # ── Intake state: fill in whichever field is still missing ───────────────
+    if lead.state == "CONTACTED":
+        if not lead.property_preferences:
+            lead.property_preferences = text
+            firestore_client.save_lead(lead)
+            tg.send_budget_buttons(chat_id, lead.lead_id)
+            return {"ok": True}
 
-    # If availability missing, treat reply as availability input then complete
-    if lead.state == "CONTACTED" and not lead.availability:
-        lead.availability = text
-        firestore_client.save_lead(lead)
-        tg.send_message(chat_id, "Perfect! Let me find some great options and available slots for you — one moment! 🔍")
-        async def _complete():
-            try:
-                await process_event(lead.lead_id, "is_complete_true", {"is_complete": True})
-            except Exception as exc:
-                log.error("complete failed for %s: %s", lead.lead_id, exc)
-        background_tasks.add_task(_complete)
-        return {"ok": True}
+        if not lead.budget:
+            lead.budget = text
+            firestore_client.save_lead(lead)
+            tg.send_availability_question(chat_id, lead.lead_id)
+            return {"ok": True}
 
-    # All other states: route through state machine (Gemini conversation)
+        if not lead.availability:
+            lead.availability = text
+            firestore_client.save_lead(lead)
+            tg.send_message(chat_id,
+                "Perfect! Let me find some available slots for you — one moment! 🔍")
+            async def _complete_from_text():
+                try:
+                    await process_event(lead.lead_id, "intake_complete", {})
+                except Exception as exc:
+                    log.error("intake_complete (text) failed for %s: %s", lead.lead_id, exc)
+                    tg.send_message(chat_id, "Sorry, something went wrong. Please try again in a moment.")
+            background_tasks.add_task(_complete_from_text)
+            return {"ok": True}
+
+    # ── All other states: Gemini-powered conversation ────────────────────────
     async def _run():
         try:
             await process_event(lead.lead_id, "inbound_message", {"body": text})
