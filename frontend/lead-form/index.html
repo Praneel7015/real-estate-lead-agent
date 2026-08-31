@@ -129,36 +129,76 @@
 
     .phone-row {
       display: flex;
-      gap: 1rem;
-      align-items: flex-end;
+      align-items: stretch;
+      gap: 0;
       border-bottom: 1px solid var(--rule);
       transition: border-color 0.2s;
     }
     .phone-row:focus-within {
       border-bottom-color: var(--brass);
     }
-    .phone-row select,
     .phone-row input {
       border-bottom: none;
-      padding-bottom: 0.65rem;
+      padding: 0.65rem 0;
     }
-    .phone-prefix {
-      width: auto;
-      min-width: 4.25rem;
+
+    .country-code-wrap {
+      position: relative;
       flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      padding-right: 1rem;
+      margin-right: 1rem;
+      border-right: 1px solid var(--rule);
+    }
+    .country-code-wrap::after {
+      content: '';
+      position: absolute;
+      right: 0.15rem;
+      top: 50%;
+      width: 0;
+      height: 0;
+      border-left: 4px solid transparent;
+      border-right: 4px solid transparent;
+      border-top: 5px solid var(--brass);
+      transform: translateY(-35%);
+      pointer-events: none;
+    }
+
+    .phone-prefix {
+      margin: 0;
+      padding: 0.65rem 1.1rem 0.65rem 0;
+      border: none;
+      border-radius: 0;
+      background: transparent;
       font-family: 'IBM Plex Sans', sans-serif;
-      font-size: 0.9rem;
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      color: var(--ink);
       cursor: pointer;
-      padding-right: 1.25rem;
+      outline: none;
+      line-height: 1.2;
       appearance: none;
       -webkit-appearance: none;
-      background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%238A734A' d='M1 1l4 4 4-4'/%3E%3C/svg%3E") no-repeat right center;
+      -moz-appearance: none;
+      box-shadow: none;
     }
+    .phone-prefix::-ms-expand { display: none; }
+    .phone-prefix:focus { color: var(--brass-dark); }
+    .phone-prefix option {
+      font-family: 'IBM Plex Sans', sans-serif;
+      color: var(--ink);
+      background: var(--paper);
+    }
+
     .phone-row input[type="tel"] {
       flex: 1;
       min-width: 0;
       width: auto;
     }
+
+    .field.has-error .phone-row { border-bottom-color: var(--error); }
 
     .field-error {
       font-family: 'IBM Plex Sans', sans-serif;
@@ -270,13 +310,15 @@
           <div class="field" id="fieldPhone">
             <label for="phone">Phone (for your agent)</label>
             <div class="phone-row">
-              <select class="phone-prefix" id="countryCode" name="countryCode" aria-label="Country code">
-                <option value="+1">+1</option>
-                <option value="+44">+44</option>
-                <option value="+91" selected>+91</option>
-                <option value="+971">+971</option>
-                <option value="+65">+65</option>
-              </select>
+              <div class="country-code-wrap">
+                <select class="phone-prefix" id="countryCode" name="countryCode" aria-label="Country code">
+                  <option value="+1">+1</option>
+                  <option value="+44">+44</option>
+                  <option value="+91" selected>+91</option>
+                  <option value="+971">+971</option>
+                  <option value="+65">+65</option>
+                </select>
+              </div>
               <input type="tel" id="phone" name="phone" placeholder="9876543210" required autocomplete="tel" />
             </div>
             <span class="field-error">Please enter a valid phone number.</span>
