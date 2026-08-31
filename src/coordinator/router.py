@@ -325,6 +325,86 @@ async def list_appointments():
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+@router.get("/calendar/status")
+async def calendar_status():
+    """
+    Diagnostic endpoint — checks Calendar API connectivity.
+    Hit this after setting CALENDAR_ID to see what's wrong.
+    """
+    import os
+    from datetime import datetime, timedelta, timezone
+
+    cal_id = os.environ.get("CALENDAR_ID", "")
+    result = {
+        "calendar_id_set": bool(cal_id),
+        "calendar_id_hint": f"{cal_id[:4]}...{cal_id[-8:]}" if len(cal_id) > 12 else cal_id,
+        "using_primary": cal_id == "primary",
+        "warning": None,
+        "api_ok": False,
+        "freebusy_ok": False,
+        "can_create": False,
+        "error": None,
+        "service_account": "real-estate-agent-sa@real-estate-agent-hack.iam.gserviceaccount.com",
+    }
+
+    if cal_id == "primary":
+        result["warning"] = (
+            "'primary' does not work with service accounts. "
+            "Use your Gmail address or the group.calendar.google.com ID "
+            "from Calendar Settings → Integrate calendar."
+        )
+
+    if not cal_id:
+        result["error"] = "CALENDAR_ID env var is not set on Cloud Run. Redeploy after adding the GitHub secret."
+        return result
+
+    try:
+        from src.scheduling.calendar_client import _get_service
+
+        service = _get_service()
+        result["api_ok"] = True
+
+        now = datetime.now(tz=timezone.utc)
+        end = now + timedelta(days=1)
+        body = {
+            "timeMin": now.isoformat(),
+            "timeMax": end.isoformat(),
+            "items": [{"id": cal_id}],
+        }
+        fb = service.freebusy().query(body=body).execute()
+        cal_data = fb.get("calendars", {}).get(cal_id, {})
+        if "errors" in cal_data:
+            result["error"] = cal_data["errors"]
+            result["warning"] = (
+                "Calendar not accessible. Share your calendar with the service account "
+                "and grant 'Make changes to events'."
+            )
+        else:
+            result["freebusy_ok"] = True
+            result["busy_blocks_today"] = len(cal_data.get("busy", []))
+
+        # Try listing one event to confirm read access
+        events = service.events().list(
+            calendarId=cal_id, maxResults=1, singleEvents=True,
+            orderBy="startTime",
+        ).execute()
+        result["can_create"] = True
+        result["recent_events_found"] = len(events.get("items", []))
+
+    except Exception as exc:
+        result["error"] = str(exc)
+        err = str(exc).lower()
+        if "403" in err or "forbidden" in err:
+            result["warning"] = (
+                "Permission denied. Enable calendar-json.googleapis.com API and "
+                "share the calendar with the service account."
+            )
+        elif "404" in err or "not found" in err:
+            result["warning"] = "Calendar ID not found. Double-check the ID in Calendar Settings."
+
+    return result
+
+
 @router.get("/leads")
 async def list_leads(state: Optional[str] = None):
     """List all leads, optionally filtered by state."""
